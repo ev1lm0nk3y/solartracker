@@ -51,6 +51,8 @@ const int MOTOR_SPEED = 200; // PWM value for motor speed (0-255)
 const int TOLERANCE = 50;    // Sensor difference tolerance to prevent jitter
 const int SHUTDOWN_LIGHT_THRESHOLD = 150; // Average light level to trigger shutdown
 const long LCD_UPDATE_INTERVAL = 1000; // Update LCD every 1000ms
+const int HEADING_LIMIT_MIN = 80;   // Minimum angle (e.g., East limit)
+const int HEADING_LIMIT_MAX = 280;  // Maximum angle (e.g., West limit)
 
 // --- Objects ---
 
@@ -94,6 +96,7 @@ void setup() {
 
 void loop() {
   readSensors();
+  readCompass(); // Update heading for limit checks
   
   avgLight = (ldrTopLeft + ldrTopRight + ldrBottomLeft + ldrBottomRight) / 4;
 
@@ -138,7 +141,6 @@ void loop() {
 
   // Periodically update diagnostics
   if (millis() - lastLcdUpdateTime > LCD_UPDATE_INTERVAL) {
-    readCompass();
     updateLCD();
     lastLcdUpdateTime = millis();
   }
@@ -270,12 +272,22 @@ void stopPitch() {
 }
 
 void rotateClockwise() {
+  if (heading >= HEADING_LIMIT_MAX) {
+    stopRotation();
+    rotationStatus = "MAX";
+    return;
+  }
   digitalWrite(MOTOR_A_DIR_PIN, HIGH);
   analogWrite(MOTOR_A_PWM_PIN, MOTOR_SPEED);
   rotationStatus = "CW";
 }
 
 void rotateCounterClockwise() {
+  if (heading <= HEADING_LIMIT_MIN) {
+    stopRotation();
+    rotationStatus = "MIN";
+    return;
+  }
   digitalWrite(MOTOR_A_DIR_PIN, LOW);
   analogWrite(MOTOR_A_PWM_PIN, MOTOR_SPEED);
   rotationStatus = "CCW";
