@@ -8,77 +8,56 @@ This document provides a detailed guide for wiring all the components of the sol
 
 ## 1. Main Assembly
 
-1.  **Arduino Motor Shield:** The Arduino Motor Shield is designed to be stacked directly on top of the Arduino Micro. Align all the pins and press it firmly into place. All connections to the motors and sensors will be made to the pins on the Motor Shield.
+1.  **Arduino Motor Shield:** The Arduino Motor Shield Rev3 is designed to stack directly on top of the Arduino Uno R4 WiFi. Align the pins and press it firmly down so the shield sits on top of the Uno.
 
 ---
 
 ## 2. Power Connections
 
-This project will be powered by a **12V DC Portable Battery** (which is recharged by your 100W solar panel).
+This project will be powered by a **12V DC Portable Battery** (recharged by your 100W solar panel).
 
 1.  **Connect Portable Battery to Motor Shield (for 12V Motors):**
-    *   Connect the **12V Positive (+)** output from your portable battery (e.g., from its barrel jack or cigarette lighter port, adapted to bare wires) to the **`Vin`** screw terminal on the Motor Shield.
-    *   Connect the **12V Ground (-)** output from your portable battery to the **`GND`** screw terminal next to `Vin` on the Motor Shield.
-    *   This supplies 12V directly to power your motors (Motor A and Motor B).
+    *   Connect the **12V Positive (+)** from your battery to the **`Vin`** screw terminal on the Motor Shield.
+    *   Connect the **12V Ground (-)** from your battery to the **`GND`** screw terminal on the Motor Shield.
 
-2.  **Connect Portable Battery to DC-DC Buck Converter (for 5V Electronics):**
-    *   Take the same **12V Positive (+)** and **12V Ground (-)** connections from your portable battery and connect them to the input terminals of a **DC-DC Buck Converter (12V to 5V)**.
-    *   Connect the **5V Positive (+)** output from the Buck Converter to the **`5V` pin** on your Arduino Micro (often accessible via the Motor Shield's header pins).
-    *   Connect the **5V Ground (-)** output from the Buck Converter to a **`GND` pin** on your Arduino Micro/Motor Shield.
-    *   This provides a clean, regulated 5V for the Arduino microcontroller, LCD, and compass.
-
-3.  **Crucial Step: Remove the `Vin Connect` Jumper:**
-    *   On the Arduino Motor Shield, locate the small jumper labeled **`Vin Connect`**. You **MUST remove this jumper**.
-    *   Removing this jumper isolates the 12V motor power supply from the 5V power supply to the Arduino's logic. This prevents electrical noise from the motors from affecting the sensitive electronics and ensures the Arduino is powered safely by the 5V buck converter.
-
-### **Power Flow Diagram (Conceptual)**
-
-```
-+------------------+     12V       +--------------------------+
-|  12V Portable    +-------------->|  Arduino Motor Shield    |-----> 12V Motors
-|  Battery Pack    |               |  (Vin & GND terminals)   |
-+------------------+               +--------------------------+
-       |   12V                             |
-       |                                   |  (Remove Vin Connect Jumper)
-       V                                   V
-+------------------+         5V        +--------------------------+
-|  DC-DC Buck      +------------------->|  Arduino (5V & GND pins) |-----> LCD, Compass, Arduino Logic
-|  Converter       |                     +--------------------------+
-| (12V Input, 5V   |
-|  Output)         |
-+------------------+
-```
+2.  **Powering the Arduino Uno R4 WiFi:**
+    *   **Option A (Recommended for isolation):** Remove the **`Vin Connect`** jumper on the Motor Shield. Use a separate power source for the Arduino (like the USB-C port connected to a 5V power bank or your DC-DC converter outputting 5V to the Arduino's 5V/GND pins). This isolates the microcontroller from motor electrical noise.
+    *   **Option B (Simplest):** Keep the **`Vin Connect`** jumper in place. The 12V connected to the shield will also power the Arduino Uno R4 WiFi (which supports up to 24V input). *Note: If you experience the Arduino resetting when motors move, switch to Option A.*
 
 ---
 
 ## 3. Motor Connections
 
 1.  **Rotation Motor (Screw Drive):**
-    *   Connect the two wires from your rotation motor to the **`Motor A`** screw terminals on the Motor Shield. Polarity doesn't matter at this stage; if the motor runs backward, you can reverse the wires or change the direction in the code.
+    *   Connect wires to **`Motor A`** terminals on the Shield.
 2.  **Pitch Motor (Linear Actuator):**
-    *   Connect the two wires from your pitch motor/actuator to the **`Motor B`** screw terminals on the Motor Shield.
+    *   Connect wires to **`Motor B`** terminals on the Shield.
 
 ---
 
 ## 4. I2C Devices (LCD and Compass)
 
-The I2C protocol allows multiple devices to share the same two wires (SDA and SCL). You will connect the LCD and the compass in parallel to the Arduino's I2C pins.
+The I2C bus uses the SDA and SCL pins. On the Arduino Uno R4 WiFi, these are located on the header near the USB connector / Reset button.
 
-*   **Arduino Micro I2C Pins:**
-    *   **SDA:** Digital Pin 2
-    *   **SCL:** Digital Pin 3
+1.  **GY-271 (QMC5883L) Compass:**
+    *   `VCC` -> **`5V`**
+    *   `GND` -> **`GND`**
+    *   `SDA` -> **`SDA`** pin (or A4)
+    *   `SCL` -> **`SCL`** pin (or A5)
 
-1.  **GY-271 (QMC5883L) Compass Connections:**
-    *   `VCC` pin -> **`5V`** on the Motor Shield
-    *   `GND` pin -> **`GND`** on the Motor Shield
-    *   `SDA` pin -> **`D2`** (SDA) on the Motor Shield
-    *   `SCL` pin -> **`D3`** (SCL) on the Motor Shield
+2.  **MPU6050 Accelerometer (GY-521):**
+    *   **Purpose:** Measures the pitch (tilt) angle to stop the motor before mechanical limits.
+    *   **Mounting:** Mount this sensor **flat** on the back of your solar panel frame.
+    *   `VCC` -> **`5V`**
+    *   `GND` -> **`GND`**
+    *   `SDA` -> **`SDA`** pin (same as compass)
+    *   `SCL` -> **`SCL`** pin (same as compass)
 
-2.  **I2C 20x4 LCD Connections:**
-    *   `VCC` pin -> **`5V`** on the Motor Shield
-    *   `GND` pin -> **`GND`** on the Motor Shield
-    *   `SDA` pin -> **`D2`** (SDA) on the Motor Shield (connect to the same row as the compass SDA)
-    *   `SCL` pin -> **`D3`** (SCL) on the Motor Shield (connect to the same row as the compass SCL)
+3.  **I2C 20x4 LCD:**
+    *   `VCC` -> **`5V`**
+    *   `GND` -> **`GND`**
+    *   `SDA` -> **`SDA`** pin (same as compass)
+    *   `SCL` -> **`SCL`** pin (same as compass)
 
 ---
 

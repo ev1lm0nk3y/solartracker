@@ -6,7 +6,7 @@ This project is a sun tracker apparatus designed to keep portable solar panels o
 
 The mechanical assembly consists of a "lazy susan" base for rotation, driven by a screw drive motor, and a 12VDC linear actuator to control the pitch (vertical angle) of the solar panels.
 
-The electronic control system is based on an Arduino Micro controller. It uses an Arduino Motor Shield Rev3 to drive both the rotation and pitch motors. Four light detectors provide the necessary input for the sun's position. A 20x4 I2C LCD displays diagnostic information, and a GY-271 (QMC5883L) compass provides heading data.
+The electronic control system is based on an Arduino Uno R4 WiFi controller. It uses an Arduino Motor Shield Rev3 to drive both the rotation and pitch motors. Four light detectors provide the necessary input for the sun's position. A 20x4 I2C LCD displays diagnostic information, and a GY-271 (QMC5883L) compass provides heading data.
 
 ## Building and Running
 
