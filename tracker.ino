@@ -42,8 +42,8 @@ enum ServerState {
     LISTENING,
     STARTING,
     STOPPED,
-}
-int wifi_server_status = ServerState.STOPPED;
+};
+ServerState wifi_server_status = STOPPED;
 
 // Custom symbols character
 uint8_t check[8] = {0x00,0x01,0x03,0x16,0x1c,0x08,0x00,0x00};
@@ -53,9 +53,9 @@ uint8_t degreeC[8]     = {0x18,0x18,0x03,0x04,0x04,0x04,0x03,0x00};
 uint8_t uparrow[8]  = {0x04,0x0e,0x1f,0x0e,0x0e,0x0e,0x00,0x00};
 uint8_t wifi[8] = {0x00,0x00,0x00,0x08,0x16,0x21,0x00,0x00};
 
+#define MANUALMODE
+
 // --- Pin Definitions ---
-// Manual Mode: Set this pin to HIGH to enable manual control
-const int MANUAL_MODE_PIN = 7;
 
 // LDRs are connected to analog pins
 const int LDR_TOP_LEFT_PIN = A0;
@@ -114,8 +114,9 @@ String rotationStatus = "STOP";
 int heading = 0;
 int pitch = 0;
 int tiltAngle = 0; // Store overall tilt for display/logging
+float mpuTemp = 0; // Global to store temp for display
 
-// LCD, motor and sensor availability
+// Peripherals: LCD, motor and sensor availability
 // 0-3: LDR Top Left, Top Right, Bottom Left, Bottom Right
 // 4: MPU6050
 // 5: Compass
@@ -123,19 +124,42 @@ int tiltAngle = 0; // Store overall tilt for display/logging
 // 7: Motor B
 // 8: LCD
 // 9: WiFi AP
-bool availability[10];
+enum PERIPHERALS {
+  LDR_TL,
+  LDR_TR,
+  LDR_BL,
+  LDR_BR,
+  MPU_SENSOR,
+  COMPASS,
+  MOTOR_A,
+  MOTOR_B,
+  LCD,
+  WIFI,
+  NUM_DEVICES
+};
+bool availability[NUM_DEVICES];
 
 // Timing variables
 unsigned long lastLcdUpdateTime = 0;
 
+// Function prototype
+
+// Generic function to print lines onto the LCD
+int writeLCD(char[] output, uint8_t col = 0, uint8_t row = 0, bool clearFirst = true);
+
 
 void setup() {
-  Serial.begin(9600);
-  // Initialize and read manual mode pin
-  pinMode(MANUAL_MODE_PIN, INPUT);
-  if (digitalRead(MANUAL_MODE_PIN) == HIGH) {
-    manualMode = true;
+#ifdef MANUALMODE
+  manualMode = true;
+#endif
+
+  for (i = 0, i < NUM_DEVICES; i++) {
+    availability[i] = false;
   }
+
+  Serial.begin(9600);
+
+  Serial.print("Initializing...");
 
   // Initialize Motor Pins
   pinMode(MOTOR_A_DIR_PIN, OUTPUT);
@@ -143,24 +167,25 @@ void setup() {
   pinMode(MOTOR_A_BRAKE_PIN, OUTPUT);
   digitalWrite(MOTOR_A_BRAKE_PIN, LOW); // Disable brake
 
-  pinMode(MOTOR_B_PWM, OUTPUT);
+  pinMode(MOTOR_B_PWM_PIN, OUTPUT);
   pinMode(MOTOR_B_BRAKE_PIN, OUTPUT);
   digitalWrite(MOTOR_B_BRAKE_PIN, LOW); // Disable brake
 
   // Initialize WiFi AP
+  Serial.print("- WiFi: ");
   status = WiFi.beginAP(ssid, pass);
   if (status != WL_AP_LISTENING) {
-    availability[9] = false;
-    Serial.println("Creating access point failed");
+    Serial.println("AP Failed\n");
     // Don't halt, just continue without WiFi
-    wifi_server_status = 3;
+    wifi_server_status = STOPPED;
   } else {
+    Serial.print(" COMPLETE\n");
+    Serial.print("- Webserver: ");
     server.begin();
     tracker_ip = WiFi.softAPIP();
-    Serial.print("AP IP address: ");
-    Serial.println(tracker_ip);
-    availability[9] = true;
-    wifi_server_status = 0;
+    Serial.print("http://" + tracker_ip + "\n");
+    availability[WIFI] = true;
+    wifi_server_status = LISTENING;
   }
 
   startupRoutine();
@@ -246,7 +271,7 @@ void loop() {
               client.println("<div></div><button onmousedown='c(\"down\")' onmouseup='c(\"stop\")'>DOWN</button><div></div>");
               client.println("</div>");
               client.println("<script>function c(a){fetch('/cmd?action='+a);}");
-              client.println("setInterval(()=>{fetch('/data').then(r=>r.json()).then(d=>{");
+              client.println("setInterval(()=>{fetch('/data').then(r=>r.json()).then(d=>{ ");
               client.println("document.getElementById('data').innerHTML='Heading: '+d.heading+' Pitch: '+d.pitch+'<br>LDRs: '+d.ldr.join(',');");
               client.println("if(d.fallen){document.getElementById('data').innerHTML+='<br><h2 style=\"color:red\">SYSTEM FALLEN! TILT: '+d.tilt+'</h2>';}");
               client.println("});}, 1000);</script>");
@@ -283,9 +308,11 @@ void loop() {
 
     // Auto-revert from manual mode
     if (manualMode) {
-      lcd.setCursor(0, 0);
-      lcd.print("==== MANUAL MODE ====");
-      Serial.println("Manual mode detected, tacking disabled.");
+      if (availability[8]) {
+        lcd.setCursor(0, 0);
+        lcd.print("==== MANUAL MODE ====");
+      }
+      Serial.println("Manual mode detected, tracking disabled.");
     }
     else if (avgLight < SHUTDOWN_LIGHT_THRESHOLD && !isShutdown) {
       shutdownRoutine();
@@ -294,11 +321,7 @@ void loop() {
       if(isShutdown) {
         // Waking up from shutdown
         isShutdown = false;
-        if (availability[8]) {
-          lcd.clear();
-          lcd.setCursor(0,0);
-          lcd.print("Waking up...");
-        }
+        writeLCD("Waking up...");
         delay(2000);
       }
 
@@ -348,14 +371,14 @@ void loop() {
 
 // --- Primary Routines ---
 
-void calibrateMPU() {
-  Serial.println("Calibrating MPU6050...");
-  for(int i=0; i<20; i++) {
-    sensors_event_t a, g, temp;
-    mpu.getEvent(&a, &g, &temp);
-    delay(20);
+
+void writeLCD(char[] output, uint8_t col, uint8_t row, bool clearFirst) {
+  if (!available[LCD]) {return;}
+  if (clearFirst) {
+    lcd.clear();
   }
-  Serial.println("MPU6050 Calibrated (Stabilized)");
+  lcd.setCursor(col, row);
+  lcd.print(output);
 }
 
 void scanI2C() {
@@ -363,14 +386,11 @@ void scanI2C() {
   int nDevices = 0;
 
   Serial.println("Scanning I2C bus...");
-  if (availability[8]) {
-      lcd.clear();
-      lcd.print("Scanning I2C...");
-  }
+  writeLCD("Scanning I2C...");
 
   // Reset critical flags (LCD availability handled by begin() return)
-  availability[4] = false;
-  availability[5] = false;
+  availability[MPU_SENSOR] = false;
+  availability[COMPASS] = false;
 
   String deviceList = "";
 
@@ -384,8 +404,8 @@ void scanI2C() {
       Serial.println(address,HEX);
       nDevices++;
 
-      if (address == MPU_ADDR) availability[4] = true;
-      if (address == 0x0D) availability[5] = true;
+      if (address == MPU_ADDR) availability[MPU_SENSOR] = true;
+      if (address == 0x0D) availability[COMPASS] = true;
 
        if (nDevices <= 4) {
           if (deviceList.length() > 0) deviceList += ",";
@@ -395,13 +415,13 @@ void scanI2C() {
   }
 
   deviceCount = nDevices;
-  if (availability[8]) {
-    lcd.setCursor(0, 1);
-    lcd.print("Found: "); lcd.print(nDevices);
-    lcd.setCursor(0, 2);
-    lcd.print("Devs: " + deviceList);
-    delay(2000);
-  }
+  lcd.lineWrap();
+  char lcdbuf[20];
+  sprintf(&lcdbuf, "Found %d devices", nDevices);
+  writeLCD(lcdbuf, 0, 1, false);
+  sprintf(&lcdbuf, "Devs: %s", deviceList);
+  writeLCD(lcdbuf, 0, 2, false);
+  delay(500);
 }
 
 void startupRoutine() {
@@ -409,15 +429,15 @@ void startupRoutine() {
 
   // Initialize LCD (HD44780)
   // begin returns 0 on success
+  Serial.write("LCD Starting... ");
   if (lcd.begin(20, 4) != 0) {
-    Serial.println("LCD Init Failed");
-    availability[8] = false;
+    Serial.write("Failed\n");
   } else {
-    availability[8] = true;
+    availability[LCD] = true;
     lcd.backlight();
-    lcd.setCursor(0, 0);
-    lcd.print("System Starting...");
-    Serial.println("System Starting...");
+    lcd.home();
+    lcd.println("Starting...");
+    Serial.write("COMPLETE\n");
 
     // Putting the LCD custom symbols into the register
     lcd.createChar(0, check);
@@ -428,33 +448,29 @@ void startupRoutine() {
     lcd.createChar(5, wifi);
   }
 
+#ifdef SCANI2CBUS
   scanI2C();
+  availability[MPU_SENSOR] = true;
+  availability[COMPASS] = true;
+#endif
 
   // Check MPU
-  if (availability[4]) {
-      if (availability[8]) {
-        lcd.setCursor(0, 1);
-        lcd.print("MPU6050... ");
-      }
+  if (availability[MPU_SENSOR]) {
+      writeLCD("MPU6050... ", 0, 1, false);
       if (!mpu.begin()) {
         Serial.println("MPU Init Failed!");
         sensorError = true;
-        if (availability[8]) {
-          lcd.print("FAILED!");
-        }
+        writeLCD("FAILED!", 11, 1, false);
       } else {
         Serial.println("MPU6050 Active");
-        mpu.setAccelerometerRange(MPU6050_RANGE_8_G);
+        // >>> PASTE MPU6050 CALIBRATION OFFSETS HERE (from calibrate.ino) <<<
+        // Example:
+        // mpu.setAccelerometerOffset(-200, 100, 1000);
+        // mpu.setGyroOffset(5, -10, 2);
+        mpu.setAccelerometerRange(MPU6050_RANGE_2_G);
         mpu.setGyroRange(MPU6050_RANGE_500_DEG);
         mpu.setFilterBandwidth(MPU6050_BAND_21_HZ);
-        if (availability[8]) {
-          lcd.print("CALIBRATING");
-        }
-        calibrateMPU();
-        if (availability[8]) {
-          lcd.setCursor(11, 1);
-          lcd.print("READY   ");
-        }
+        writeLCD("READY", 11, 1, false);
       }
   } else {
       Serial.println("MPU6050 Missing!");
@@ -462,42 +478,35 @@ void startupRoutine() {
   }
 
   // Check Compass
-  if (availability[5]) {
+  if (availability[COMPASS]) {
       compass.init();
+      // >>> PASTE QMC5883L COMPASS CALIBRATION HERE (from QMC5883LCompass example sketch) <<<
+      // Example:
+      // compass.setCalibration(-1537, 1266, -1961, 958, -1342, 1492);
       Serial.println("Compass Active");
   } else {
       Serial.println("Compass Missing!");
       // sensorError = true; // Optional: Treat compass as critical? Yes, for heading limits.
-      sensorError = true;
+      sensorError = false;
   }
 
   if (sensorError) {
       Serial.println("CRITICAL: Sensors missing. Entering MANUAL MODE ONLY.");
       manualMode = true;
-      if (availability[8]) {
-          lcd.clear();
-          lcd.print("SENSOR ERROR!");
-          lcd.setCursor(0, 1);
-          lcd.print("Manual Mode Only");
-          delay(2000);
-      }
+      writeLCD("+++ SENSOR ERROR! +++");
+      writeLCD("Manual Mode Only", 0, 1, false);
+      delay(2000);
       return; // Skip homing
   }
 
-  if (availability[8]) {
-    lcd.clear();
-    lcd.print("Homing motors...");
-  }
+  writeLCD("Homing motors... ");
   Serial.println("Homing motors...");
 
   // --- Home Motors ---
   flattenPitchMotor(); // Use flatten as homing for pitch
   homeRotationMotor();
 
-  if (availability[8]) {
-    lcd.clear();
-    lcd.print("Startup Complete.");
-  }
+  writeLCD("Startup Complete.");
   Serial.println("Startup Complete.");
   delay(1000);
 }
@@ -520,11 +529,7 @@ void shutdownRoutine() {
     flattenPitchMotor();
   }
 
-  if (availability[8]) {
-    lcd.clear();
-    lcd.setCursor(0,0);
-    lcd.print("System asleep.");
-  }
+  writeLCD("System asleep.");
   Serial.println("System asleep.");
 }
 
@@ -541,8 +546,6 @@ void readCompass() {
   compass.read();
   heading = compass.getAzimuth();
 }
-
-float mpuTemp = 0; // Global to store temp for display
 
 void logMPUData(sensors_event_t a, sensors_event_t g, sensors_event_t temp) {
   Serial.print("Accel X: "); Serial.print(a.acceleration.x);
@@ -641,18 +644,18 @@ void updateLCD() {
   lcd.print(buffer);
 
   // Line 3: Temp & WiFi Status (Simplified)
-  // Alternating or fixed. Let's show Temp and IP last octet or status
   // Disable if in Manual Mode
   if (!manualMode) {
-    char wifiStat = "\1"; // Disconnected
-    if (wifi_server_status == ServerState.LISTENING) wifiStat = "\0"; // Listening
-    else if (status == WL_AP_LISTENING) wifiStat = "\4"; // AP Active
+    char wifiStat = (char)1; // Default to cross (Disconnected)
+    if (wifi_server_status == LISTENING) wifiStat = (char)0; // check (Listening)
+    else if (status == WL_AP_LISTENING) wifiStat = (char)5; // wifi symbol (AP Active)
 
-    // Format: T:25.5°C WiFiSrv: √
-    char stat_buffer[20];
+    // Format: T:25.5*C WiFiSrv: V
+    char stat_buffer[21];
     lcd.setCursor(0,3);
-    sprintf(stat_buffer, "T:%-.1d\2 WiFiSrv: %s", mpuTemp, wifiStat);
-    lcd.write(stat_buffer);
+    // Note: \3 is degreeC symbol from register
+    sprintf(stat_buffer, "T:%.1f\3 WiFiSrv: %c", mpuTemp, wifiStat);
+    lcd.print(stat_buffer);
   }
 }
 
