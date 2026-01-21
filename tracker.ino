@@ -416,10 +416,10 @@ void scanI2C() {
 
   deviceCount = nDevices;
   lcd.lineWrap();
-  char lcdbuf[20];
-  sprintf(&lcdbuf, "Found %d devices", nDevices);
+  char lcdbuf[21];
+  sprintf(lcdbuf, "Found %d devices", nDevices);
   writeLCD(lcdbuf, 0, 1, false);
-  sprintf(&lcdbuf, "Devs: %s", deviceList);
+  sprintf(lcdbuf, "Devs: %s", deviceList.c_str());
   writeLCD(lcdbuf, 0, 2, false);
   delay(500);
 }
@@ -436,7 +436,7 @@ void startupRoutine() {
     availability[LCD] = true;
     lcd.backlight();
     lcd.home();
-    lcd.println("Starting...");
+    lcd.print("Starting...");
     Serial.write("COMPLETE\n");
 
     // Putting the LCD custom symbols into the register
@@ -593,7 +593,7 @@ void readPitch() {
 }
 
 void updateLCD() {
-  if (!availability[8]) return;
+  if (!availability[LCD]) return;
 
   if (isFallen) {
     lcd.clear();
@@ -646,9 +646,9 @@ void updateLCD() {
   // Line 3: Temp & WiFi Status (Simplified)
   // Disable if in Manual Mode
   if (!manualMode) {
-    char wifiStat = (char)1; // Default to cross (Disconnected)
-    if (wifi_server_status == LISTENING) wifiStat = (char)0; // check (Listening)
-    else if (status == WL_AP_LISTENING) wifiStat = (char)5; // wifi symbol (AP Active)
+    char wifiStat = '\1'; // Default to cross (Disconnected)
+    if (wifi_server_status == LISTENING) wifiStat = '\0'; // check (Listening)
+    else if (status == WL_AP_LISTENING) wifiStat = '\5'; // wifi symbol (AP Active)
 
     // Format: T:25.5*C WiFiSrv: V
     char stat_buffer[21];

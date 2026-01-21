@@ -87,8 +87,8 @@ void calibrateCompass() {
     compass.init();
     Serial.println("This will provide calibration settings for your QMC5883L chip. When prompted, move the magnetometer in all directions until the calibration is complete.");
     Serial.println("Calibration will begin in:");
-    for (i = 5; i > 0; i--) {
-        Serial.println(" " + i + "  seconds");
+    for (int i = 5; i > 0; i--) { // Added 'int' declaration
+        Serial.println(" " + String(i) + "  seconds"); // Added String cast
         delay(1000);
     }
 
