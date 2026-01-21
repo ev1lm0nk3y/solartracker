@@ -145,7 +145,7 @@ unsigned long lastLcdUpdateTime = 0;
 // Function prototype
 
 // Generic function to print lines onto the LCD
-int writeLCD(char[] output, uint8_t col = 0, uint8_t row = 0, bool clearFirst = true);
+void writeLCD(char output[], uint8_t col = 0, uint8_t row = 0, bool clearFirst = true);
 
 
 void setup() {
@@ -153,7 +153,7 @@ void setup() {
   manualMode = true;
 #endif
 
-  for (i = 0, i < NUM_DEVICES; i++) {
+  for (int i = 0; i < NUM_DEVICES; i++) {
     availability[i] = false;
   }
 
@@ -183,7 +183,7 @@ void setup() {
     Serial.print("- Webserver: ");
     server.begin();
     tracker_ip = WiFi.softAPIP();
-    Serial.print("http://" + tracker_ip + "\n");
+    Serial.println("http://" + tracker_ip.toString() + "\n");
     availability[WIFI] = true;
     wifi_server_status = LISTENING;
   }
@@ -308,10 +308,7 @@ void loop() {
 
     // Auto-revert from manual mode
     if (manualMode) {
-      if (availability[8]) {
-        lcd.setCursor(0, 0);
-        lcd.print("==== MANUAL MODE ====");
-      }
+      writeLCD("==== MANUAL MODE ====");
       Serial.println("Manual mode detected, tracking disabled.");
     }
     else if (avgLight < SHUTDOWN_LIGHT_THRESHOLD && !isShutdown) {
@@ -372,8 +369,8 @@ void loop() {
 // --- Primary Routines ---
 
 
-void writeLCD(char[] output, uint8_t col, uint8_t row, bool clearFirst) {
-  if (!available[LCD]) {return;}
+void writeLCD(char output[], uint8_t col, uint8_t row, bool clearFirst) {
+  if (!availability[LCD]) {return;}
   if (clearFirst) {
     lcd.clear();
   }
