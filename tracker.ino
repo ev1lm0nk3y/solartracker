@@ -93,6 +93,26 @@ const int MPU_ADDR = 0x68;                   // I2C address of MPU6050
 const float MAX_TILT_ANGLE = 45.0;           // Maximum allowed tilt angle from vertical
 const long INITIALIZATION_DELAY_MS = 10000;  // Prevent shutdown by waiting 10m before allowing it
 
+// --- Classes ---
+
+class VirtualLCD {
+  public:
+    String lines[4];
+    VirtualLCD() {
+      for(int i=0; i<4; i++) lines[i] = "                    ";
+    }
+    void clear() {
+      for(int i=0; i<4; i++) lines[i] = "                    ";
+    }
+    void setLine(int row, String text) {
+      if (row >= 0 && row < 4) {
+        lines[row] = text;
+        while(lines[row].length() < 20) lines[row] += " ";
+        if(lines[row].length() > 20) lines[row] = lines[row].substring(0, 20);
+      }
+    }
+};
+
 // --- Objects ---
 
 // LCD: Auto-detect address
@@ -100,6 +120,7 @@ hd44780_I2Cexp lcd;
 Adafruit_MPU6050 mpu;
 QMC5883LCompass compass;
 LDRManager ldrs(LDR_TOP_LEFT_PIN, LDR_TOP_RIGHT_PIN, LDR_BOTTOM_LEFT_PIN, LDR_BOTTOM_RIGHT_PIN);
+VirtualLCD vLcd;
 
 // --- Global Variables ---
 
@@ -251,6 +272,9 @@ void handleClient(WiFiClient client) {
             doc["tilt"] = tiltAngle;
             doc["pitchStatus"] = pitchStatus;
             doc["rotationStatus"] = rotationStatus;
+
+            JsonArray lcdLines = doc.createNestedArray("lcd");
+            for(int i=0; i<4; i++) lcdLines.add(vLcd.lines[i]);
 
             serializeJson(doc, client);
           } else if (requestLine.indexOf("GET /cmd") >= 0) {
@@ -614,21 +638,27 @@ void updateLCD() {
 
   if (isFallen) {
     lcd.clear();
+    vLcd.clear();
     lcd.setCursor(0, 0);
     lcd.print("!!! CRITICAL ERROR !!!");
+    vLcd.setLine(0, "!!! CRITICAL ERROR !!!");
     lcd.setCursor(0, 1);
     lcd.print("  SYSTEM FALLEN  ");
+    vLcd.setLine(1, "  SYSTEM FALLEN  ");
     lcd.setCursor(0, 2);
     lcd.print("Tilt Angle: ");
     lcd.print(tiltAngle);
+    vLcd.setLine(2, "Tilt Angle: " + String(tiltAngle));
     lcd.setCursor(0, 3);
     lcd.print("Please Reset System");
+    vLcd.setLine(3, "Please Reset System");
     return;
   }
 
   if (isShutdown) return;  // Don't update LCD if sleeping
 
   lcd.clear();
+  vLcd.clear();
   char buffer[21];
 
   // If in manual mode place a banner on all updates
@@ -636,6 +666,7 @@ void updateLCD() {
   if (manualMode) {
     lcd.setCursor(0, 0);
     lcd.print("==== MANUAL MODE ====");
+    vLcd.setLine(0, "==== MANUAL MODE ====");
     startLine = 1;
   }
 
@@ -643,22 +674,26 @@ void updateLCD() {
   sprintf(buffer, "L:%-4d R:%-4d", ldrs.getLeftAverage(), ldrs.getRightAverage());
   lcd.setCursor(0, startLine);
   lcd.print(buffer);
+  vLcd.setLine(startLine, String(buffer));
 
   // Line 1: Motor Status
   // If sensor error, show Manual Mode or Error
   if (sensorError) {
     lcd.setCursor(0, startLine + 1);
     lcd.print("SENSOR ERROR - MAN");
+    vLcd.setLine(startLine + 1, "SENSOR ERROR - MAN");
   } else {
     sprintf(buffer, "P:%-4s R:%-4s", pitchStatus.c_str(), rotationStatus.c_str());
     lcd.setCursor(0, startLine + 1);
     lcd.print(buffer);
+    vLcd.setLine(startLine + 1, String(buffer));
   }
 
   // Line 2: Heading & Pitch
   sprintf(buffer, "H:%-3d P:%-3d", heading, pitch);
   lcd.setCursor(0, startLine + 2);
   lcd.print(buffer);
+  vLcd.setLine(startLine + 2, String(buffer));
 
   // Line 3: Temp & WiFi Status (Simplified)
   // Disable if in Manual Mode
@@ -673,6 +708,11 @@ void updateLCD() {
     // Note: \3 is degreeC symbol from register
     sprintf(stat_buffer, "T:%.1f\3 WiFiSrv: %c", mpuTemp, wifiStat);
     lcd.print(stat_buffer);
+    
+    // For virtual LCD, replace special chars with readable ones
+    String vStatStr = (wifiStat == '\0') ? "OK" : ((wifiStat == '\1') ? "X" : "AP");
+    sprintf(stat_buffer, "T:%.1fC WiFi:%s", mpuTemp, vStatStr.c_str());
+    vLcd.setLine(3, String(stat_buffer));
   }
 }
 

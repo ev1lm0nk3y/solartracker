@@ -12,6 +12,12 @@ const elements = {
     rotStatus: document.getElementById('rot-status-val'),
     pitchStatus: document.getElementById('pitch-status-val'),
     fallenAlert: document.getElementById('fallen-alert'),
+    lcd: [
+        document.getElementById('lcd-0'),
+        document.getElementById('lcd-1'),
+        document.getElementById('lcd-2'),
+        document.getElementById('lcd-3')
+    ],
     ldr: {
         tl: document.querySelector('#ldr-tl .value'),
         tr: document.querySelector('#ldr-tr .value'),
@@ -30,7 +36,13 @@ let mockData = {
     manual: false, fallen: false,
     pitchStatus: 'STOP', rotationStatus: 'STOP',
     ldr: [512, 510, 520, 508],
-    ldrAvg: { top: 511, bottom: 514, left: 516, right: 509 }
+    ldrAvg: { top: 511, bottom: 514, left: 516, right: 509 },
+    lcd: [
+        "L:512  R:514       ",
+        "P:STOP R:STOP      ",
+        "H:180  P:45        ",
+        "T:25.5C WiFi:OK    "
+    ]
 };
 let mockMovement = { heading: 0, pitch: 0 };
 
@@ -82,6 +94,15 @@ async function updateData() {
         mockData.ldrAvg.left = Math.floor((mockData.ldr[0] + mockData.ldr[2]) / 2);
         mockData.ldrAvg.right = Math.floor((mockData.ldr[1] + mockData.ldr[3]) / 2);
 
+        // Mock LCD dynamic text
+        let start = mockData.manual ? 1 : 0;
+        if (mockData.manual) mockData.lcd[0] = "==== MANUAL MODE ====";
+        
+        mockData.lcd[start] = `L:${mockData.ldrAvg.left.toString().padEnd(4)} R:${mockData.ldrAvg.right.toString().padEnd(4)}    `.substring(0,20);
+        mockData.lcd[start+1] = `P:${mockData.pitchStatus.padEnd(4)} R:${mockData.rotationStatus.padEnd(4)}    `.substring(0,20);
+        mockData.lcd[start+2] = `H:${Math.floor(mockData.heading).toString().padEnd(3)}  P:${Math.floor(mockData.pitch).toString().padEnd(3)}     `.substring(0,20);
+        if (start === 0) mockData.lcd[3] = "T:25.5C WiFi:OK    ";
+
         updateUI(mockData);
         elements.statusBadge.textContent = 'Test Mode';
         elements.statusBadge.className = 'status-badge test-mode';
@@ -132,6 +153,12 @@ function updateUI(data) {
         elements.ldr.avgBottom.textContent = data.ldrAvg.bottom;
         elements.ldr.avgLeft.textContent = data.ldrAvg.left;
         elements.ldr.avgRight.textContent = data.ldrAvg.right;
+    }
+
+    if (data.lcd && data.lcd.length === 4) {
+        data.lcd.forEach((line, i) => {
+            elements.lcd[i].textContent = line;
+        });
     }
 }
 

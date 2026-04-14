@@ -43,6 +43,24 @@ h1 {
     font-size: 0.8rem;
 }
 
+.lcd-screen {
+    background-color: #2c3e50; /* Dark blue-ish backlight color */
+    color: #00ff00; /* Bright green text */
+    font-family: 'Courier New', Courier, monospace;
+    padding: 15px;
+    border-radius: 4px;
+    border: 8px solid #34495e;
+    box-shadow: inset 0 0 10px rgba(0,0,0,0.5);
+    line-height: 1.2;
+    font-size: 1.2rem;
+    letter-spacing: 2px;
+}
+
+.lcd-line {
+    white-space: pre;
+    height: 1.4rem;
+}
+
 .connected {
     background-color: var(--secondary-color);
     color: white;
