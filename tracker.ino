@@ -31,6 +31,7 @@
 #include <hd44780ioClass/hd44780_I2Cexp.h>
 #include <QMC5883LCompass.h>
 #include <WiFiS3.h>
+#include <ArduinoJson.h>
 #include "LDRManager.h"
 
 // --- WiFi Settings ---
@@ -228,31 +229,21 @@ void handleClient(WiFiClient client) {
             client.println("Connection: close");
             client.println();
 
-            client.print("{");
-            client.print("\"ldr\":[");
-            client.print(ldrs.getTopLeft());
-            client.print(",");
-            client.print(ldrs.getTopRight());
-            client.print(",");
-            client.print(ldrs.getBottomLeft());
-            client.print(",");
-            client.print(ldrs.getBottomRight());
-            client.print("],");
-            client.print("\"heading\":");
-            client.print(heading);
-            client.print(",");
-            client.print("\"pitch\":");
-            client.print(pitch);
-            client.print(",");
-            client.print("\"manual\":");
-            client.print(manualMode ? "true" : "false");
-            client.print(",");
-            client.print("\"fallen\":");
-            client.print(isFallen ? "true" : "false");
-            client.print(",");
-            client.print("\"tilt\":");
-            client.print(tiltAngle);
-            client.print("}");
+            StaticJsonDocument<256> doc;
+            
+            JsonArray ldrArray = doc.createNestedArray("ldr");
+            ldrArray.add(ldrs.getTopLeft());
+            ldrArray.add(ldrs.getTopRight());
+            ldrArray.add(ldrs.getBottomLeft());
+            ldrArray.add(ldrs.getBottomRight());
+            
+            doc["heading"] = heading;
+            doc["pitch"] = pitch;
+            doc["manual"] = manualMode;
+            doc["fallen"] = isFallen;
+            doc["tilt"] = tiltAngle;
+
+            serializeJson(doc, client);
           } else if (requestLine.indexOf("GET /cmd") >= 0) {
             client.println("HTTP/1.1 200 OK");
             client.println("Content-Type: text/plain");
