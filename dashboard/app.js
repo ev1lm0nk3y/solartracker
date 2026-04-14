@@ -96,7 +96,7 @@ async function updateData() {
 
         // Mock LCD dynamic text
         let start = mockData.manual ? 1 : 0;
-        if (mockData.manual) mockData.lcd[0] = "==== MANUAL MODE ====";
+        if (mockData.manual) mockData.lcd[0] = "=== MANUAL  MODE ===";
         
         mockData.lcd[start] = `L:${mockData.ldrAvg.left.toString().padEnd(4)} R:${mockData.ldrAvg.right.toString().padEnd(4)}    `.substring(0,20);
         mockData.lcd[start+1] = `P:${mockData.pitchStatus.padEnd(4)} R:${mockData.rotationStatus.padEnd(4)}    `.substring(0,20);

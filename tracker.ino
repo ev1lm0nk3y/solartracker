@@ -665,8 +665,8 @@ void updateLCD() {
   int startLine = 0;
   if (manualMode) {
     lcd.setCursor(0, 0);
-    lcd.print("==== MANUAL MODE ====");
-    vLcd.setLine(0, "==== MANUAL MODE ====");
+    lcd.print("=== MANUAL  MODE ===");
+    vLcd.setLine(0, "=== MANUAL  MODE ===");
     startLine = 1;
   }
 
