@@ -57,6 +57,7 @@ uint8_t wifi[8] = { 0x00, 0x00, 0x00, 0x08, 0x16, 0x21, 0x00, 0x00 };
 
 // #define MANUALMODE // Don't do auto solar tracking
 #define DEBUG_MPU  // print out mpu data every collection
+#define SCANI2CBUS // Scan I2C bus on startup to detect sensors
 
 // --- Pin Definitions ---
 
