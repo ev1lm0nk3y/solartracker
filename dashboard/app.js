@@ -9,6 +9,8 @@ const elements = {
     pitch: document.getElementById('pitch-val'),
     tilt: document.getElementById('tilt-val'),
     mode: document.getElementById('mode-val'),
+    rotStatus: document.getElementById('rot-status-val'),
+    pitchStatus: document.getElementById('pitch-status-val'),
     fallenAlert: document.getElementById('fallen-alert'),
     ldr: {
         tl: document.querySelector('#ldr-tl .value'),
@@ -22,6 +24,7 @@ const elements = {
 let mockData = {
     heading: 180, pitch: 45, tilt: 1.5,
     manual: false, fallen: false,
+    pitchStatus: 'STOP', rotationStatus: 'STOP',
     ldr: [512, 510, 520, 508]
 };
 let mockMovement = { heading: 0, pitch: 0 };
@@ -57,6 +60,11 @@ async function updateData() {
         
         if (!mockData.manual) {
             mockData.heading = (mockData.heading + 0.5) % 360; // Auto tracking simulation
+            mockData.rotationStatus = 'CW'; // Simulate motor running while auto tracking
+            mockData.pitchStatus = 'STOP';
+        } else {
+            mockData.rotationStatus = mockMovement.heading > 0 ? 'CW' : (mockMovement.heading < 0 ? 'CCW' : 'STOP');
+            mockData.pitchStatus = mockMovement.pitch > 0 ? 'UP' : (mockMovement.pitch < 0 ? 'DOWN' : 'STOP');
         }
 
         mockData.ldr = mockData.ldr.map(val => {
@@ -93,6 +101,8 @@ function updateUI(data) {
     elements.tilt.textContent = data.tilt.toFixed(1);
     
     elements.mode.textContent = data.manual ? 'MANUAL' : 'AUTO';
+    elements.rotStatus.textContent = data.rotationStatus || 'STOP';
+    elements.pitchStatus.textContent = data.pitchStatus || 'STOP';
     
     if (data.fallen) {
         elements.fallenAlert.classList.remove('hidden');

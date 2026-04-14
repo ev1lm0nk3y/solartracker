@@ -243,6 +243,8 @@ void handleClient(WiFiClient client) {
             doc["manual"] = manualMode;
             doc["fallen"] = isFallen;
             doc["tilt"] = tiltAngle;
+            doc["pitchStatus"] = pitchStatus;
+            doc["rotationStatus"] = rotationStatus;
 
             serializeJson(doc, client);
           } else if (requestLine.indexOf("GET /cmd") >= 0) {

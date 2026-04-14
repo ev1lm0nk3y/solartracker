@@ -135,12 +135,14 @@ button:hover {
 }
 
 .status-display {
+    display: flex;
+    justify-content: space-around;
     text-align: center;
     padding: 10px 0;
 }
 
 .status-item .value {
-    font-size: 1.5rem;
+    font-size: 1.2rem;
     font-weight: bold;
     color: var(--primary-color);
 }
@@ -152,6 +154,7 @@ button:hover {
     color: white;
     border-radius: 4px;
     font-weight: bold;
+    text-align: center;
     animation: blink 1s infinite;
 }
 
@@ -190,6 +193,21 @@ button:hover {
     font-weight: bold;
 }
 
+.controls-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 2px solid var(--bg-color);
+    padding-bottom: 10px;
+    margin-bottom: 20px;
+}
+
+.controls-header h2 {
+    margin: 0;
+    border: none;
+    padding: 0;
+}
+
 .control-pad {
     display: flex;
     flex-direction: column;
@@ -208,7 +226,14 @@ button:hover {
     padding: 0;
 }
 
+.pad-spacer {
+    width: 80px;
+}
+
 #auto-btn {
+    width: auto;
+    padding: 0 15px;
+    height: 40px;
     background-color: var(--secondary-color);
 }
 

@@ -51,9 +51,17 @@
                             <span class="label">Mode</span>
                             <span id="mode-val" class="value">--</span>
                         </div>
-                        <div id="fallen-alert" class="alert hidden">
-                            ⚠️ SYSTEM FALLEN!
+                        <div class="status-item">
+                            <span class="label">Rotation</span>
+                            <span id="rot-status-val" class="value">--</span>
                         </div>
+                        <div class="status-item">
+                            <span class="label">Pitch</span>
+                            <span id="pitch-status-val" class="value">--</span>
+                        </div>
+                    </div>
+                    <div id="fallen-alert" class="alert hidden">
+                        ⚠️ SYSTEM FALLEN!
                     </div>
                 </div>
 
@@ -82,14 +90,17 @@
 
             <section class="controls-section">
                 <div class="card">
-                    <h2>Manual Controls</h2>
+                    <div class="controls-header">
+                        <h2>Manual Controls</h2>
+                        <button class="control-btn" id="auto-btn" data-action="auto">RESUME AUTO</button>
+                    </div>
                     <div class="control-pad">
                         <div class="pad-row">
                             <button class="control-btn" data-action="up">▲ UP</button>
                         </div>
                         <div class="pad-row">
                             <button class="control-btn" data-action="left">◀ LEFT</button>
-                            <button class="control-btn" id="auto-btn" data-action="auto">AUTO</button>
+                            <div class="pad-spacer"></div>
                             <button class="control-btn" data-action="right">RIGHT ▶</button>
                         </div>
                         <div class="pad-row">
