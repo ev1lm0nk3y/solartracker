@@ -16,7 +16,11 @@ const elements = {
         tl: document.querySelector('#ldr-tl .value'),
         tr: document.querySelector('#ldr-tr .value'),
         bl: document.querySelector('#ldr-bl .value'),
-        br: document.querySelector('#ldr-br .value')
+        br: document.querySelector('#ldr-br .value'),
+        avgTop: document.getElementById('ldr-avg-top'),
+        avgBottom: document.getElementById('ldr-avg-bottom'),
+        avgLeft: document.getElementById('ldr-avg-left'),
+        avgRight: document.getElementById('ldr-avg-right')
     }
 };
 
@@ -25,7 +29,8 @@ let mockData = {
     heading: 180, pitch: 45, tilt: 1.5,
     manual: false, fallen: false,
     pitchStatus: 'STOP', rotationStatus: 'STOP',
-    ldr: [512, 510, 520, 508]
+    ldr: [512, 510, 520, 508],
+    ldrAvg: { top: 511, bottom: 514, left: 516, right: 509 }
 };
 let mockMovement = { heading: 0, pitch: 0 };
 
@@ -71,6 +76,11 @@ async function updateData() {
             let newVal = val + Math.floor((Math.random() - 0.5) * 20);
             return Math.max(0, Math.min(1023, newVal)); // Jitter LDRs slightly
         });
+        
+        mockData.ldrAvg.top = Math.floor((mockData.ldr[0] + mockData.ldr[1]) / 2);
+        mockData.ldrAvg.bottom = Math.floor((mockData.ldr[2] + mockData.ldr[3]) / 2);
+        mockData.ldrAvg.left = Math.floor((mockData.ldr[0] + mockData.ldr[2]) / 2);
+        mockData.ldrAvg.right = Math.floor((mockData.ldr[1] + mockData.ldr[3]) / 2);
 
         updateUI(mockData);
         elements.statusBadge.textContent = 'Test Mode';
@@ -115,6 +125,13 @@ function updateUI(data) {
         elements.ldr.tr.textContent = data.ldr[1];
         elements.ldr.bl.textContent = data.ldr[2];
         elements.ldr.br.textContent = data.ldr[3];
+    }
+    
+    if (data.ldrAvg) {
+        elements.ldr.avgTop.textContent = data.ldrAvg.top;
+        elements.ldr.avgBottom.textContent = data.ldrAvg.bottom;
+        elements.ldr.avgLeft.textContent = data.ldrAvg.left;
+        elements.ldr.avgRight.textContent = data.ldrAvg.right;
     }
 }
 

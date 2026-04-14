@@ -193,6 +193,34 @@ button:hover {
     font-weight: bold;
 }
 
+.ldr-averages {
+    margin-top: 15px;
+    padding-top: 10px;
+    border-top: 1px dashed #ccc;
+    font-size: 0.85rem;
+    color: var(--text-light);
+}
+
+.avg-row {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 5px;
+    padding: 0 10px;
+}
+
+.avg-val {
+    font-weight: bold;
+    color: var(--text-color);
+    width: 35px;
+    text-align: right;
+    display: inline-block;
+}
+
+.avg-label {
+    width: 50px;
+    display: inline-block;
+}
+
 .controls-header {
     display: flex;
     justify-content: space-between;

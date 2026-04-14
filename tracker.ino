@@ -237,6 +237,12 @@ void handleClient(WiFiClient client) {
             ldrArray.add(ldrs.getTopRight());
             ldrArray.add(ldrs.getBottomLeft());
             ldrArray.add(ldrs.getBottomRight());
+
+            JsonObject ldrAvg = doc.createNestedObject("ldrAvg");
+            ldrAvg["top"] = ldrs.getTopAverage();
+            ldrAvg["bottom"] = ldrs.getBottomAverage();
+            ldrAvg["left"] = ldrs.getLeftAverage();
+            ldrAvg["right"] = ldrs.getRightAverage();
             
             doc["heading"] = heading;
             doc["pitch"] = pitch;
