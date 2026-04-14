@@ -70,15 +70,12 @@ void calibrateMPU() {
   Serial.println(F("\n>>> COPY THE LINES BELOW INTO startupRoutine() <<<"));
   Serial.println(F("    // -- MPU6050 Calibration Offsets --"));
 
-  Serial.print(F("    mpu.setAccelerometerOffset("));
-  Serial.print(-avgAx); Serial.print(F(", "));
-  Serial.print(-avgAy); Serial.print(F(", "));
-  Serial.print(4096 - avgAz); Serial.println(F(");")); // Compensate for 1g gravity
+  char buffer[100];
+  sprintf(buffer, "    mpu.setAccelerometerOffset(%d, %d, %d);\n", -avgAx, -avgAy, 4096 - avgAz);
+  Serial.print(buffer);
 
-  Serial.print(F("    mpu.setGyroOffset("));
-  Serial.print(-avgGx); Serial.print(F(", "));
-  Serial.print(-avgGy); Serial.print(F(", "));
-  Serial.print(-avgGz); Serial.println(F(");"));
+  sprintf(buffer, "    mpu.setGyroOffset(%d, %d, %d);\n", -avgGx, -avgGy, -avgGz);
+  Serial.print(buffer);
 
   Serial.println(F("---------------------------------------"));
 }
@@ -95,22 +92,21 @@ void calibrateCompass() {
     Serial.println("CALIBRATING. Keep moving your sensor...");
     compass.calibrate();
 
-    Serial.println("DONE. Copy the lines below and paste it into your projects sketch.);");
+    Serial.println("DONE. Copy the lines below and paste it into your projects sketch.");
     Serial.println();
-    Serial.print("compass.setCalibrationOffsets(");
-    Serial.print(compass.getCalibrationOffset(0));
-    Serial.print(", ");
-    Serial.print(compass.getCalibrationOffset(1));
-    Serial.print(", ");
-    Serial.print(compass.getCalibrationOffset(2));
-    Serial.println(");");
-    Serial.print("compass.setCalibrationScales(");
-    Serial.print(compass.getCalibrationScale(0));
-    Serial.print(", ");
-    Serial.print(compass.getCalibrationScale(1));
-    Serial.print(", ");
-    Serial.print(compass.getCalibrationScale(2));
-    Serial.println(");");
+    
+    char buffer[100];
+    sprintf(buffer, "compass.setCalibrationOffsets(%.2f, %.2f, %.2f);\n", 
+            compass.getCalibrationOffset(0), 
+            compass.getCalibrationOffset(1), 
+            compass.getCalibrationOffset(2));
+    Serial.print(buffer);
+    
+    sprintf(buffer, "compass.setCalibrationScales(%.2f, %.2f, %.2f);\n", 
+            compass.getCalibrationScale(0), 
+            compass.getCalibrationScale(1), 
+            compass.getCalibrationScale(2));
+    Serial.print(buffer);
   }
 
   void loop() {
