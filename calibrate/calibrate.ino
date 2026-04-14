@@ -107,7 +107,7 @@ void calibrateCompass() {
             compass.getCalibrationScale(1), 
             compass.getCalibrationScale(2));
     Serial.print(buffer);
-  }
+  
 
   void loop() {
     delay(1000);
