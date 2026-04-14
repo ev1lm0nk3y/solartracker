@@ -53,6 +53,11 @@ h1 {
     color: white;
 }
 
+.test-mode {
+    background-color: #9c27b0;
+    color: white;
+}
+
 .card {
     background: var(--card-bg);
     border-radius: var(--border-radius);

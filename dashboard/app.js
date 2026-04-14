@@ -18,6 +18,14 @@ const elements = {
     }
 };
 
+// Mock State for Testing
+let mockData = {
+    heading: 180, pitch: 45, tilt: 1.5,
+    manual: false, fallen: false,
+    ldr: [512, 510, 520, 508]
+};
+let mockMovement = { heading: 0, pitch: 0 };
+
 // Initialize
 if (trackerIp) {
     elements.ipInput.value = trackerIp;
@@ -41,6 +49,27 @@ function startMonitoring() {
 
 async function updateData() {
     if (!trackerIp) return;
+
+    // --- TEST MODE LOGIC ---
+    if (trackerIp.toLowerCase() === 'test') {
+        mockData.heading = (mockData.heading + mockMovement.heading + 360) % 360;
+        mockData.pitch = Math.max(0, Math.min(90, mockData.pitch + mockMovement.pitch));
+        
+        if (!mockData.manual) {
+            mockData.heading = (mockData.heading + 0.5) % 360; // Auto tracking simulation
+        }
+
+        mockData.ldr = mockData.ldr.map(val => {
+            let newVal = val + Math.floor((Math.random() - 0.5) * 20);
+            return Math.max(0, Math.min(1023, newVal)); // Jitter LDRs slightly
+        });
+
+        updateUI(mockData);
+        elements.statusBadge.textContent = 'Test Mode';
+        elements.statusBadge.className = 'status-badge test-mode';
+        return;
+    }
+    // -----------------------
 
     try {
         const response = await fetch(`http://${trackerIp}/data`);
@@ -82,6 +111,25 @@ function updateUI(data) {
 // Controls
 async function sendCommand(action) {
     if (!trackerIp) return;
+
+    // --- TEST MODE LOGIC ---
+    if (trackerIp.toLowerCase() === 'test') {
+        console.log(`[Test Mode] Command: ${action}`);
+        mockData.manual = true;
+        mockMovement = { heading: 0, pitch: 0 };
+
+        if (action === 'left') mockMovement.heading = -5;
+        if (action === 'right') mockMovement.heading = 5;
+        if (action === 'up') mockMovement.pitch = 5;
+        if (action === 'down') mockMovement.pitch = -5;
+        if (action === 'auto') mockData.manual = false;
+        
+        // 'stop' resets movement, which is already handled by the object reset above
+        updateData(); // Instantly update UI for snappy feedback
+        return;
+    }
+    // -----------------------
+
     try {
         await fetch(`http://${trackerIp}/cmd?action=${action}`);
     } catch (error) {
