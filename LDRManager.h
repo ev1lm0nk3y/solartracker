@@ -2,17 +2,21 @@
 #define LDR_MANAGER_H
 
 #include <Arduino.h>
+#include <Adafruit_ADS1X15.h>
 
 class LDRManager {
   private:
-    uint8_t pinTL, pinTR, pinBL, pinBR;
+    Adafruit_ADS1115 ads;
     int valTL, valTR, valBL, valBR;
     int avgTop, avgBottom, avgLeft, avgRight, avgTotal;
     int diffVertical, diffHorizontal;
 
   public:
-    LDRManager(uint8_t tl, uint8_t tr, uint8_t bl, uint8_t br);
+    LDRManager();
     
+    // Initialize the ADS1115
+    bool begin();
+
     // Reads sensors and performs calculations
     void update();
 

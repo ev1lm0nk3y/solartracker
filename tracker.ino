@@ -97,7 +97,7 @@ const long INITIALIZATION_DELAY_MS = 10000;  // Prevent shutdown by waiting 10m 
 hd44780_I2Cexp lcd;
 Adafruit_MPU6050 mpu;
 QMC5883LCompass compass;
-LDRManager ldrs(LDR_TOP_LEFT_PIN, LDR_TOP_RIGHT_PIN, LDR_BOTTOM_LEFT_PIN, LDR_BOTTOM_RIGHT_PIN);
+LDRManager ldrs;
 
 // --- Global Variables ---
 
@@ -160,6 +160,12 @@ void setup() {
   Serial.begin(9600);
 
   Serial.println("Initializing...");
+  
+  if (!ldrs.begin()) {
+    Serial.println("Failed to initialize ADS1115 for LDRs!");
+    // We should probably mark it as unavailable if we had a status array for it,
+    // but for now just log it.
+  }
 
   // Initialize Motor Pins
   pinMode(MOTOR_A_DIR_PIN, OUTPUT);

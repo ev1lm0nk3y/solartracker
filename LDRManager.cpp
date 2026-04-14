@@ -1,30 +1,26 @@
 #include "LDRManager.h"
 
-LDRManager::LDRManager(uint8_t tl, uint8_t tr, uint8_t bl, uint8_t br) {
-  pinTL = tl;
-  pinTR = tr;
-  pinBL = bl;
-  pinBR = br;
-  
+LDRManager::LDRManager() {
   // Initialize values
   valTL = valTR = valBL = valBR = 0;
   avgTop = avgBottom = avgLeft = avgRight = avgTotal = 0;
   diffVertical = diffHorizontal = 0;
-  
-  // Pins are analog inputs, no pinMode needed for analogRead on most Arduinos,
-  // but explicit input mode doesn't hurt.
-  pinMode(pinTL, INPUT);
-  pinMode(pinTR, INPUT);
-  pinMode(pinBL, INPUT);
-  pinMode(pinBR, INPUT);
+}
+
+bool LDRManager::begin() {
+  // Try to initialize the ADS1115 at default I2C address (0x48)
+  return ads.begin();
 }
 
 void LDRManager::update() {
-  // Read raw values
-  valTL = analogRead(pinTL);
-  valTR = analogRead(pinTR);
-  valBL = analogRead(pinBL);
-  valBR = analogRead(pinBR);
+  // Read raw values from ADS1115 (Channels 0 to 3)
+  // Note: ADS1115 is 16-bit, so values range from 0-32767 for positive voltages.
+  // We can right shift or map if we need to match the old 0-1023 range, 
+  // but for tracking, raw ratios/differences work fine.
+  valTL = ads.readADC_SingleEnded(0);
+  valTR = ads.readADC_SingleEnded(1);
+  valBL = ads.readADC_SingleEnded(2);
+  valBR = ads.readADC_SingleEnded(3);
 
   // Calculate Averages
   avgTop = (valTL + valTR) / 2;
