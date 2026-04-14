@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solar Tracker Dashboard</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Solar Tracker Dashboard</h1>
+            <div id="connection-status" class="status-badge disconnected">Disconnected</div>
+        </header>
+
+        <main>
+            <section class="config-section">
+                <div class="card">
+                    <h2>Connection Settings</h2>
+                    <div class="input-group">
+                        <label for="tracker-ip">Tracker IP Address:</label>
+                        <input type="text" id="tracker-ip" placeholder="e.g., 192.168.1.50">
+                        <button id="connect-btn">Connect</button>
+                    </div>
+                </div>
+            </section>
+
+            <section class="data-grid">
+                <div class="card sensor-card">
+                    <h2>Orientation</h2>
+                    <div class="data-display">
+                        <div class="data-item">
+                            <span class="label">Heading</span>
+                            <span id="heading-val" class="value">--</span><span class="unit">°</span>
+                        </div>
+                        <div class="data-item">
+                            <span class="label">Pitch</span>
+                            <span id="pitch-val" class="value">--</span><span class="unit">°</span>
+                        </div>
+                        <div class="data-item">
+                            <span class="label">Tilt</span>
+                            <span id="tilt-val" class="value">--</span><span class="unit">°</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card status-card">
+                    <h2>System Status</h2>
+                    <div class="status-display">
+                        <div class="status-item">
+                            <span class="label">Mode</span>
+                            <span id="mode-val" class="value">--</span>
+                        </div>
+                        <div id="fallen-alert" class="alert hidden">
+                            ⚠️ SYSTEM FALLEN!
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card ldr-card">
+                    <h2>Light Sensors (LDR)</h2>
+                    <div class="ldr-grid">
+                        <div class="ldr-cell" id="ldr-tl">
+                            <span class="label">TL</span>
+                            <span class="value">--</span>
+                        </div>
+                        <div class="ldr-cell" id="ldr-tr">
+                            <span class="label">TR</span>
+                            <span class="value">--</span>
+                        </div>
+                        <div class="ldr-cell" id="ldr-bl">
+                            <span class="label">BL</span>
+                            <span class="value">--</span>
+                        </div>
+                        <div class="ldr-cell" id="ldr-br">
+                            <span class="label">BR</span>
+                            <span class="value">--</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="controls-section">
+                <div class="card">
+                    <h2>Manual Controls</h2>
+                    <div class="control-pad">
+                        <div class="pad-row">
+                            <button class="control-btn" data-action="up">▲ UP</button>
+                        </div>
+                        <div class="pad-row">
+                            <button class="control-btn" data-action="left">◀ LEFT</button>
+                            <button class="control-btn" id="auto-btn" data-action="auto">AUTO</button>
+                            <button class="control-btn" data-action="right">RIGHT ▶</button>
+                        </div>
+                        <div class="pad-row">
+                            <button class="control-btn" data-action="down">▼ DOWN</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <footer>
+            <p>Solar Tracker Monitor &copy; 2024</p>
+        </footer>
+    </div>
+    <script src="app.js"></script>
+</body>
+</html>

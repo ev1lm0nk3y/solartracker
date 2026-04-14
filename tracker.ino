@@ -226,6 +226,7 @@ void handleClient(WiFiClient client) {
           if (requestLine.indexOf("GET /data") >= 0) {
             client.println("HTTP/1.1 200 OK");
             client.println("Content-Type: application/json");
+            client.println("Access-Control-Allow-Origin: *");
             client.println("Connection: close");
             client.println();
 
@@ -247,6 +248,7 @@ void handleClient(WiFiClient client) {
           } else if (requestLine.indexOf("GET /cmd") >= 0) {
             client.println("HTTP/1.1 200 OK");
             client.println("Content-Type: text/plain");
+            client.println("Access-Control-Allow-Origin: *");
             client.println("Connection: close");
             client.println();
 
