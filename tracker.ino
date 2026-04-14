@@ -315,8 +315,15 @@ void handleClient(WiFiClient client) {
 
 void main_loop() {
   // --- Main Logic ---
-  
-  // Update LDR readings
+
+  // Stop motors to prevent electrical interference on analog pins A0-A3
+  stopRotation();
+  stopPitch();
+
+  // Brief delay to allow motor flyback noise to settle
+  delay(50);
+
+  // Update LDR readings cleanly
   ldrs.update();
 
   if (!sensorError) {
@@ -325,8 +332,6 @@ void main_loop() {
   }
 
   if (isFallen) {
-    stopRotation();
-    stopPitch();
     // In fallen state, we do not proceed with tracking
     // We still allow LCD updates to show the error
     return;
@@ -350,23 +355,29 @@ void main_loop() {
     int verticalDiff = ldrs.getVerticalDiff();
     int horizontalDiff = ldrs.getHorizontalDiff();
 
-    // Pitch control
+    bool needsMove = false;
+
+    // Pitch control check
     if (abs(verticalDiff) > TOLERANCE) {
       if (verticalDiff > 0) pitchDown();
       else pitchUp();
-    } else {
-      stopPitch();
+      needsMove = true;
     }
 
-    // Rotation control
+    // Rotation control check
     if (abs(horizontalDiff) > TOLERANCE) {
       if (horizontalDiff > 0) rotateCounterClockwise();
       else rotateClockwise();
-    } else {
-      stopRotation();
+      needsMove = true;
+    }
+
+    // If we initiated movement, let it run for a brief burst before stopping to read again
+    if (needsMove) {
+       delay(200); // 200ms burst of movement
+       stopRotation();
+       stopPitch();
     }
   }
-
   // Periodically update diagnostics
   if (millis() - lastLcdUpdateTime > LCD_UPDATE_INTERVAL) {
     updateLCD();
