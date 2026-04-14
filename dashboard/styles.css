@@ -152,18 +152,51 @@ button:hover {
     color: var(--text-light);
 }
 
-.status-display {
+.config-header {
     display: flex;
-    justify-content: space-around;
-    text-align: center;
-    padding: 10px 0;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 2px solid var(--bg-color);
+    padding-bottom: 10px;
+    margin-bottom: 15px;
 }
 
-.status-item .value {
-    font-size: 1.2rem;
-    font-weight: bold;
-    color: var(--primary-color);
+.config-header h2 {
+    border-bottom: none;
+    margin: 0;
+    padding: 0;
 }
+
+.system-mode-inline {
+    background-color: var(--bg-color);
+    padding: 5px 15px;
+    border-radius: 20px;
+    font-weight: bold;
+}
+
+.system-mode-inline .value {
+    color: var(--primary-color);
+    margin-left: 5px;
+}
+
+.motor-status-display {
+    display: flex;
+    justify-content: space-around;
+    padding-top: 15px;
+    margin-top: 15px;
+    border-top: 1px dashed #ccc;
+}
+
+.motor-val {
+    font-size: 1.2rem !important;
+    color: var(--secondary-color) !important;
+}
+
+/* Remove old styles that are no longer used */
+.status-display {
+    display: none;
+}
+
 
 .alert {
     margin-top: 15px;

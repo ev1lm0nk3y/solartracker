@@ -14,69 +14,28 @@
         </header>
 
         <main>
-            <section class="lcd-section">
-                <div class="card lcd-card-wrapper">
-                    <h2>Virtual LCD (20x4)</h2>
-                    <div class="lcd-screen">
-                        <div class="lcd-line" id="lcd-0">                    </div>
-                        <div class="lcd-line" id="lcd-1">                    </div>
-                        <div class="lcd-line" id="lcd-2">                    </div>
-                        <div class="lcd-line" id="lcd-3">                    </div>
-                    </div>
-                </div>
-            </section>
-
             <section class="config-section">
                 <div class="card">
-                    <h2>Connection Settings</h2>
+                    <div class="config-header">
+                        <h2>Connection & Status</h2>
+                        <div class="system-mode-inline">
+                            <span class="label">Mode:</span>
+                            <span id="mode-val" class="value">--</span>
+                        </div>
+                    </div>
                     <div class="input-group">
                         <label for="tracker-ip">Tracker IP Address:</label>
                         <input type="text" id="tracker-ip" placeholder="e.g., 192.168.1.50 (or type 'test')">
                         <button id="connect-btn">Connect</button>
                     </div>
-                </div>
-            </section>
-
-            <section class="data-grid">
-                <div class="card sensor-card">
-                    <h2>Orientation</h2>
-                    <div class="data-display">
-                        <div class="data-item">
-                            <span class="label">Heading</span>
-                            <span id="heading-val" class="value">--</span><span class="unit">°</span>
-                        </div>
-                        <div class="data-item">
-                            <span class="label">Pitch</span>
-                            <span id="pitch-val" class="value">--</span><span class="unit">°</span>
-                        </div>
-                        <div class="data-item">
-                            <span class="label">Tilt</span>
-                            <span id="tilt-val" class="value">--</span><span class="unit">°</span>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="card status-card">
-                    <h2>System Status</h2>
-                    <div class="status-display">
-                        <div class="status-item">
-                            <span class="label">Mode</span>
-                            <span id="mode-val" class="value">--</span>
-                        </div>
-                        <div class="status-item">
-                            <span class="label">Rotation</span>
-                            <span id="rot-status-val" class="value">--</span>
-                        </div>
-                        <div class="status-item">
-                            <span class="label">Pitch</span>
-                            <span id="pitch-status-val" class="value">--</span>
-                        </div>
-                    </div>
                     <div id="fallen-alert" class="alert hidden">
                         ⚠️ SYSTEM FALLEN!
                     </div>
                 </div>
+            </section>
 
+            <section class="data-grid">
+                <!-- 1. Light Sensors -->
                 <div class="card ldr-card">
                     <h2>Light Sensors (LDR)</h2>
                     <div class="ldr-grid">
@@ -118,6 +77,46 @@
                             <span class="label">BR</span>
                             <span class="value">--</span>
                         </div>
+                    </div>
+                </div>
+
+                <!-- 2. Orientation & Motors -->
+                <div class="card sensor-card">
+                    <h2>Orientation & Motors</h2>
+                    <div class="data-display">
+                        <div class="data-item">
+                            <span class="label">Heading</span>
+                            <span id="heading-val" class="value">--</span><span class="unit">°</span>
+                        </div>
+                        <div class="data-item">
+                            <span class="label">Pitch</span>
+                            <span id="pitch-val" class="value">--</span><span class="unit">°</span>
+                        </div>
+                        <div class="data-item">
+                            <span class="label">Tilt</span>
+                            <span id="tilt-val" class="value">--</span><span class="unit">°</span>
+                        </div>
+                    </div>
+                    <div class="motor-status-display">
+                        <div class="data-item">
+                            <span class="label">Rotation Motor</span>
+                            <span id="rot-status-val" class="value motor-val">--</span>
+                        </div>
+                        <div class="data-item">
+                            <span class="label">Pitch Motor</span>
+                            <span id="pitch-status-val" class="value motor-val">--</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. Virtual LCD -->
+                <div class="card lcd-card-wrapper">
+                    <h2>Virtual LCD (20x4)</h2>
+                    <div class="lcd-screen">
+                        <div class="lcd-line" id="lcd-0">                    </div>
+                        <div class="lcd-line" id="lcd-1">                    </div>
+                        <div class="lcd-line" id="lcd-2">                    </div>
+                        <div class="lcd-line" id="lcd-3">                    </div>
                     </div>
                 </div>
             </section>
