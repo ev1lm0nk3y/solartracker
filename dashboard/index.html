@@ -68,31 +68,43 @@
                 <div class="card ldr-card">
                     <h2>Light Sensors (LDR)</h2>
                     <div class="ldr-grid">
+                        <!-- Top Row -->
                         <div class="ldr-cell" id="ldr-tl">
                             <span class="label">TL</span>
                             <span class="value">--</span>
+                        </div>
+                        <div class="ldr-cell avg">
+                            <span class="label">TOP AVG</span>
+                            <span class="value" id="ldr-avg-top">--</span>
                         </div>
                         <div class="ldr-cell" id="ldr-tr">
                             <span class="label">TR</span>
                             <span class="value">--</span>
                         </div>
+
+                        <!-- Middle Row -->
+                        <div class="ldr-cell avg">
+                            <span class="label">LEFT AVG</span>
+                            <span class="value" id="ldr-avg-left">--</span>
+                        </div>
+                        <div class="ldr-cell empty"></div>
+                        <div class="ldr-cell avg">
+                            <span class="label">RIGHT AVG</span>
+                            <span class="value" id="ldr-avg-right">--</span>
+                        </div>
+
+                        <!-- Bottom Row -->
                         <div class="ldr-cell" id="ldr-bl">
                             <span class="label">BL</span>
                             <span class="value">--</span>
                         </div>
+                        <div class="ldr-cell avg">
+                            <span class="label">BOTTOM AVG</span>
+                            <span class="value" id="ldr-avg-bottom">--</span>
+                        </div>
                         <div class="ldr-cell" id="ldr-br">
                             <span class="label">BR</span>
                             <span class="value">--</span>
-                        </div>
-                    </div>
-                    <div class="ldr-averages">
-                        <div class="avg-row">
-                            <span class="avg-label">Top:</span> <span id="ldr-avg-top" class="avg-val">--</span>
-                            <span class="avg-label">Bottom:</span> <span id="ldr-avg-bottom" class="avg-val">--</span>
-                        </div>
-                        <div class="avg-row">
-                            <span class="avg-label">Left:</span> <span id="ldr-avg-left" class="avg-val">--</span>
-                            <span class="avg-label">Right:</span> <span id="ldr-avg-right" class="avg-val">--</span>
                         </div>
                     </div>
                 </div>
