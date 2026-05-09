@@ -1,0 +1,19 @@
+{
+  "languages": {
+    "C++": {
+      "language_servers": ["clangd"]
+    }
+  },
+  "file_types": {
+    "C++": ["ino", "pde"]
+  },
+  "lsp": {
+    "clangd": {
+      "binary": {
+        "arguments": [
+          "--query-driver=**/*g++*,**/*gcc*"
+        ]
+      }
+    }
+  }
+}

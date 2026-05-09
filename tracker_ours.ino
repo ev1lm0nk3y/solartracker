@@ -24,15 +24,15 @@
 */
 
 // --- Libraries ---
-#include <Arduino.h>
+#include <Adafruit_MPU6050.h>
+#include <Adafruit_Sensor.h>
 #include <Wire.h>
 #include <hd44780.h>
 #include <hd44780ioClass/hd44780_I2Cexp.h>
+#include <QMC5883LCompass.h>
 #include <WiFiS3.h>
 #include <ArduinoJson.h>
 #include "LDRManager.h"
-#include "MotorController.h"
-#include "SensorManager.h"
 
 // --- WiFi Settings ---
 char ssid[] = "SolarTrackerAP";
@@ -61,31 +61,37 @@ uint8_t wifi[8] = { 0x00, 0x00, 0x00, 0x08, 0x16, 0x21, 0x00, 0x00 };
 #define SCANI2CBUS // Scan I2C bus on startup to detect sensors
 
 // --- Pin Definitions ---
+
+// LDRs are connected to analog pins
 const int LDR_TOP_LEFT_PIN = A0;
 const int LDR_TOP_RIGHT_PIN = A1;
 const int LDR_BOTTOM_LEFT_PIN = A2;
 const int LDR_BOTTOM_RIGHT_PIN = A3;
 
-// Motor Shield Rev3 Pins
+// Motor Shield Rev3 Pin Definitions
+// Motor A (Rotation)
 const int MOTOR_A_DIR_PIN = 12;
 const int MOTOR_A_PWM_PIN = 3;
 const int MOTOR_A_BRAKE_PIN = 9;
+
+// Motor B (Pitch)
 const int MOTOR_B_DIR_PIN = 13;
 const int MOTOR_B_PWM_PIN = 11;
 const int MOTOR_B_BRAKE_PIN = 8;
 
 // --- Constants ---
-const int MOTOR_SPEED = 200;
-const int TOLERANCE = 50;
-const int SHUTDOWN_LIGHT_THRESHOLD = 150;
-const long LCD_UPDATE_INTERVAL = 1000;
-const int HEADING_LIMIT_MIN = 80;
-const int HEADING_LIMIT_MAX = 280;
-const int PITCH_LIMIT_MIN = 5;
-const int PITCH_LIMIT_MAX = 75;
+
+const int MOTOR_SPEED = 200;                 // PWM value for motor speed (0-255)
+const int TOLERANCE = 50;                    // Sensor difference tolerance to prevent jitter
+const int SHUTDOWN_LIGHT_THRESHOLD = 150;    // Average light level to trigger shutdown
+const long LCD_UPDATE_INTERVAL = 1000;       // Update LCD every 60000ms
+const int HEADING_LIMIT_MIN = 80;            // Minimum angle (e.g., East limit)
+const int HEADING_LIMIT_MAX = 280;           // Maximum angle (e.g., West limit)
+const int PITCH_LIMIT_MIN = 5;               // Minimum angle (degrees) - Flat
+const int PITCH_LIMIT_MAX = 75;              // Maximum angle (degrees) - Upright
 const int MPU_ADDR = 0x68;                   // I2C address of MPU6050
-const float MAX_TILT_ANGLE = 45.0;
-const long INITIALIZATION_DELAY_MS = 10000;
+const float MAX_TILT_ANGLE = 45.0;           // Maximum allowed tilt angle from vertical
+const long INITIALIZATION_DELAY_MS = 10000;  // Prevent shutdown by waiting 10m before allowing it
 
 // --- Classes ---
 
@@ -108,35 +114,61 @@ class VirtualLCD {
 };
 
 // --- Objects ---
+
+// LCD: Auto-detect address
 hd44780_I2Cexp lcd;
-VirtualLCD vLcd;
+Adafruit_MPU6050 mpu;
+QMC5883LCompass compass;
 LDRManager ldrs(LDR_TOP_LEFT_PIN, LDR_TOP_RIGHT_PIN, LDR_BOTTOM_LEFT_PIN, LDR_BOTTOM_RIGHT_PIN);
-MotorController motors(MOTOR_A_DIR_PIN, MOTOR_A_PWM_PIN, MOTOR_A_BRAKE_PIN, 
-                       MOTOR_B_DIR_PIN, MOTOR_B_PWM_PIN, MOTOR_B_BRAKE_PIN, MOTOR_SPEED);
-SensorManager sensors(MAX_TILT_ANGLE);
+VirtualLCD vLcd;
 
 // --- Global Variables ---
-int deviceCount = 0;
-bool isShutdown = false;
-bool manualMode = false;
-bool sensorError = false;
-unsigned long lastManualCommandTime = 0;
-const unsigned long MANUAL_TIMEOUT = 60000;
 
-enum PERIPHERALS { LDR_TL, LDR_TR, LDR_BL, LDR_BR, MPU_SENSOR, COMPASS, MOTOR_A, MOTOR_B, LCD, WIFI, NUM_DEVICES };
+int deviceCount = 0;  // Number of I2C devices found
+
+// State variables
+bool isShutdown = false;
+bool isFallen = false;
+bool manualMode = false;
+bool sensorError = false;  // New flag for hardware failures
+unsigned long lastManualCommandTime = 0;
+const unsigned long MANUAL_TIMEOUT = 60000;  // 1 minute timeout
+String pitchStatus = "STOP";
+String rotationStatus = "STOP";
+int heading = 0;
+int pitch = 0;
+int tiltAngle = 0;  // Store overall tilt for display/logging
+float mpuTemp = 0;  // Global to store temp for display
+
+// Peripherals: LCD, motor and sensor availability
+// 0-3: LDR Top Left, Top Right, Bottom Left, Bottom Right
+// 4: MPU6050
+// 5: Compass
+// 6: Motor A
+// 7: Motor B
+// 8: LCD
+// 9: WiFi AP
+enum PERIPHERALS {
+  LDR_TL,
+  LDR_TR,
+  LDR_BL,
+  LDR_BR,
+  MPU_SENSOR,
+  COMPASS,
+  MOTOR_A,
+  MOTOR_B,
+  LCD,
+  WIFI,
+  NUM_DEVICES
+};
 bool availability[NUM_DEVICES];
+
+// Timing variables
 unsigned long lastLcdUpdateTime = 0;
 
 // Function prototypes
+// Generic function to print lines onto the LCD
 void writeLCD(char output[], uint8_t col = 0, uint8_t row = 0, bool clearFirst = true);
-void handleClient(WiFiClient client);
-void main_loop();
-void scanI2C();
-void startupRoutine();
-void shutdownRoutine();
-void updateLCD();
-void flattenPitchMotor();
-void homeRotationMotor();
 
 // setup and loops
 void setup() {
@@ -149,17 +181,25 @@ void setup() {
   }
 
   Serial.begin(9600);
+
   Serial.println("Initializing...");
 
-  // Initialize Motors
-  motors.begin();
-  motors.setLimits(PITCH_LIMIT_MIN, PITCH_LIMIT_MAX, HEADING_LIMIT_MIN, HEADING_LIMIT_MAX);
+  // Initialize Motor Pins
+  pinMode(MOTOR_A_DIR_PIN, OUTPUT);
+  pinMode(MOTOR_A_PWM_PIN, OUTPUT);
+  pinMode(MOTOR_A_BRAKE_PIN, OUTPUT);
+  digitalWrite(MOTOR_A_BRAKE_PIN, LOW);  // Disable brake
+
+  pinMode(MOTOR_B_PWM_PIN, OUTPUT);
+  pinMode(MOTOR_B_BRAKE_PIN, OUTPUT);
+  digitalWrite(MOTOR_B_BRAKE_PIN, LOW);  // Disable brake
 
   // Initialize WiFi AP
   Serial.print("- WiFi: ");
   status = WiFi.beginAP(ssid, pass);
   if (status != WL_AP_LISTENING) {
     Serial.println("AP Failed\n");
+    // Don't halt, just continue without WiFi
     wifi_server_status = STOPPED;
   } else {
     Serial.print(" COMPLETE\n");
@@ -187,6 +227,9 @@ void loop() {
   }
 
   main_loop();
+  while (1) {
+    delay(2000);
+  }
 }
 
 void handleClient(WiFiClient client) {
@@ -222,13 +265,13 @@ void handleClient(WiFiClient client) {
             ldrAvg["left"] = ldrs.getLeftAverage();
             ldrAvg["right"] = ldrs.getRightAverage();
             
-            doc["heading"] = sensors.getHeading();
-            doc["pitch"] = sensors.getPitch();
+            doc["heading"] = heading;
+            doc["pitch"] = pitch;
             doc["manual"] = manualMode;
-            doc["fallen"] = sensors.hasFallen();
-            doc["tilt"] = sensors.getTiltAngle();
-            doc["pitchStatus"] = motors.getPitchStatus();
-            doc["rotationStatus"] = motors.getRotationStatus();
+            doc["fallen"] = isFallen;
+            doc["tilt"] = tiltAngle;
+            doc["pitchStatus"] = pitchStatus;
+            doc["rotationStatus"] = rotationStatus;
 
             JsonArray lcdLines = doc.createNestedArray("lcd");
             for(int i=0; i<4; i++) lcdLines.add(vLcd.lines[i]);
@@ -241,21 +284,23 @@ void handleClient(WiFiClient client) {
             client.println("Connection: close");
             client.println();
 
-            if (sensors.hasFallen()) {
+            if (isFallen) {
               client.print("ERROR: SYSTEM FALLEN");
             } else {
               manualMode = true;
               lastManualCommandTime = millis();
 
-              if (requestLine.indexOf("action=left") >= 0) motors.rotateCCW(sensors.getHeading());
-              else if (requestLine.indexOf("action=right") >= 0) motors.rotateCW(sensors.getHeading());
-              else if (requestLine.indexOf("action=up") >= 0) motors.pitchUp(sensors.getPitch());
-              else if (requestLine.indexOf("action=down") >= 0) motors.pitchDown(sensors.getPitch());
+              if (requestLine.indexOf("action=left") >= 0) rotateCounterClockwise();
+              else if (requestLine.indexOf("action=right") >= 0) rotateClockwise();
+              else if (requestLine.indexOf("action=up") >= 0) pitchUp();
+              else if (requestLine.indexOf("action=down") >= 0) pitchDown();
               else if (requestLine.indexOf("action=stop") >= 0) {
-                motors.stopAll();
+                stopRotation();
+                stopPitch();
               } else if (requestLine.indexOf("action=auto") >= 0) {
                 manualMode = false;
-                motors.stopAll();
+                stopRotation();
+                stopPitch();
               }
               client.print("OK");
             }
@@ -295,55 +340,66 @@ void handleClient(WiFiClient client) {
 }
 
 void main_loop() {
-  // Update sensors
+  // --- Main Logic ---
+  
+  // Update LDR readings
   ldrs.update();
+
   if (!sensorError) {
-    sensors.update(false); // pass true for serial debug
+    readCompass();  // Update heading for limit checks
+    readPitch();    // Update pitch for limit checks and check safety
   }
 
-  if (sensors.hasFallen()) {
-    motors.stopAll();
+  if (isFallen) {
+    stopRotation();
+    stopPitch();
+    // In fallen state, we do not proceed with tracking
+    // We still allow LCD updates to show the error
     return;
   }
 
   int avgLight = ldrs.getTotalAverage();
 
-  // Shutdown logic
+  // When the light gets low and it hasn't just started, begin the shutdown routine
   if (avgLight < SHUTDOWN_LIGHT_THRESHOLD && !isShutdown && millis() > INITIALIZATION_DELAY_MS) {
     shutdownRoutine();
   } else if (avgLight >= SHUTDOWN_LIGHT_THRESHOLD) {
+    // ... (Existing Tracking Logic) ...
     if (isShutdown) {
+      // Waking up from shutdown
       isShutdown = false;
       writeLCD("Waking up...");
       delay(2000);
     }
 
-    // Tracking Logic
-    int vDiff = ldrs.getVerticalDiff();
-    int hDiff = ldrs.getHorizontalDiff();
+    // --- Sun Tracking Logic ---
+    int verticalDiff = ldrs.getVerticalDiff();
+    int horizontalDiff = ldrs.getHorizontalDiff();
 
-    if (abs(vDiff) > TOLERANCE) {
-      if (vDiff > 0) motors.pitchDown(sensors.getPitch());
-      else motors.pitchUp(sensors.getPitch());
+    // Pitch control
+    if (abs(verticalDiff) > TOLERANCE) {
+      if (verticalDiff > 0) pitchDown();
+      else pitchUp();
     } else {
-      motors.stopPitch();
+      stopPitch();
     }
 
-    if (abs(hDiff) > TOLERANCE) {
-      if (hDiff > 0) motors.rotateCCW(sensors.getHeading());
-      else motors.rotateCW(sensors.getHeading());
+    // Rotation control
+    if (abs(horizontalDiff) > TOLERANCE) {
+      if (horizontalDiff > 0) rotateCounterClockwise();
+      else rotateClockwise();
     } else {
-      motors.stopRotation();
+      stopRotation();
     }
   }
 
-  // UI Update
+  // Periodically update diagnostics
   if (millis() - lastLcdUpdateTime > LCD_UPDATE_INTERVAL) {
     updateLCD();
     lastLcdUpdateTime = millis();
   }
 
-  delay(100);
+  delay(100);  // Main loop delay
 }
 
 // --- Primary Routines ---
@@ -404,6 +460,8 @@ void scanI2C() {
 void startupRoutine() {
   Wire.begin();
 
+  // Initialize LCD (HD44780)
+  // begin returns 0 on success
   Serial.write("LCD Starting... ");
   if (lcd.begin(20, 4) != 0) {
     Serial.write("Failed\n");
@@ -412,6 +470,9 @@ void startupRoutine() {
     lcd.backlight();
     lcd.home();
     lcd.print("Starting...");
+    Serial.write("COMPLETE\n");
+
+    // Putting the LCD custom symbols into the register
     lcd.createChar(0, check);
     lcd.createChar(1, cross);
     lcd.createChar(2, degreeSymbol);
@@ -422,22 +483,45 @@ void startupRoutine() {
 
 #ifdef SCANI2CBUS
   scanI2C();
+  availability[MPU_SENSOR] = true;
+  availability[COMPASS] = true;
 #endif
 
-  // MPU Setup
-  writeLCD("MPU6050... ", 0, 1, false);
-  if (!sensors.beginMPU()) {
-    Serial.println("MPU Init Failed!");
-    sensorError = true;
-    writeLCD("FAILED!", 11, 1, false);
+  // Check MPU
+  if (availability[MPU_SENSOR]) {
+    writeLCD("MPU6050... ", 0, 1, false);
+    if (!mpu.begin()) {
+      Serial.println("MPU Init Failed!");
+      sensorError = true;
+      writeLCD("FAILED!", 11, 1, false);
+    } else {
+      Serial.println("MPU6050 Active");
+      // >>> PASTE MPU6050 CALIBRATION OFFSETS HERE (from calibrate.ino) <<<
+      // Example:
+      // mpu.setAccelerometerOffset(-200, 100, 1000);
+      // mpu.setGyroOffset(5, -10, 2);
+      mpu.setAccelerometerRange(MPU6050_RANGE_2_G);
+      mpu.setGyroRange(MPU6050_RANGE_500_DEG);
+      mpu.setFilterBandwidth(MPU6050_BAND_21_HZ);
+      writeLCD("READY", 11, 1, false);
+    }
   } else {
-    Serial.println("MPU6050 Active");
-    writeLCD("READY", 11, 1, false);
+    Serial.println("MPU6050 Missing!");
+    sensorError = true;
   }
 
-  // Compass Setup
-  sensors.beginCompass();
-  Serial.println("Compass Active");
+  // Check Compass
+  if (availability[COMPASS]) {
+    compass.init();
+    // >>> PASTE QMC5883L COMPASS CALIBRATION HERE (from QMC5883LCompass example sketch) <<<
+    // Example:
+    // compass.setCalibration(-1537, 1266, -1961, 958, -1342, 1492);
+    Serial.println("Compass Active");
+  } else {
+    Serial.println("Compass Missing!");
+    // sensorError = true; // Optional: Treat compass as critical? Yes, for heading limits.
+    sensorError = false;
+  }
 
   if (sensorError) {
     Serial.println("CRITICAL: Sensors missing. Entering MANUAL MODE ONLY.");
@@ -445,38 +529,114 @@ void startupRoutine() {
     writeLCD("+++ SENSOR ERROR! +++");
     writeLCD("Manual Mode Only", 0, 1, false);
     delay(2000);
-    return;
+    return;  // Skip homing
   }
 
   writeLCD("Homing motors... ");
-  flattenPitchMotor();
+  Serial.println("Homing motors...");
+
+  // --- Home Motors ---
+  flattenPitchMotor();  // Use flatten as homing for pitch
   homeRotationMotor();
 
   writeLCD("Startup Complete.");
+  Serial.println("Startup Complete.");
   delay(1000);
 }
 
 void shutdownRoutine() {
   isShutdown = true;
   Serial.println("Low light detected. Shutting down.");
-  writeLCD("Low light detected.");
-  writeLCD("Shutting down...", 0, 1, false);
+  if (availability[8]) {
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("Low light detected.");
+    lcd.setCursor(0, 1);
+    lcd.print("Shutting down...");
+  }
 
-  motors.stopAll();
+  stopRotation();
 
+  // --- Flatten Panel ---
   if (!sensorError) {
     flattenPitchMotor();
   }
+
   writeLCD("System asleep.");
   Serial.println("System asleep.");
 }
 
 // --- Sensor & Display Functions ---
 
+void readSensors() {
+  // Now handled by LDRManager class call in main_loop
+  ldrs.update();
+}
+
+void readCompass() {
+  compass.read();
+  heading = compass.getAzimuth();
+}
+
+void logMPUData(sensors_event_t a, sensors_event_t g, sensors_event_t temp) {
+  Serial.print("Accel X: ");
+  Serial.print(a.acceleration.x);
+  Serial.print(", Y: ");
+  Serial.print(a.acceleration.y);
+  Serial.print(", Z: ");
+  Serial.print(a.acceleration.z);
+  Serial.print(" m/s^2");
+
+  Serial.print(" | Rotation X: ");
+  Serial.print(g.gyro.x);
+  Serial.print(", Y: ");
+  Serial.print(g.gyro.y);
+  Serial.print(", Z: ");
+  Serial.print(g.gyro.z);
+  Serial.print(" rad/s");
+
+  Serial.print(" | Temperature: ");
+  Serial.print(temp.temperature);
+  Serial.println(" degC");
+}
+
+void readPitch() {
+  sensors_event_t a, g, temp;
+  mpu.getEvent(&a, &g, &temp);
+#ifdef DEBUG_MPU
+  logMPUData(a, g, temp);
+#endif
+
+  // Store temp for LCD
+  mpuTemp = temp.temperature;
+
+  // Log data
+  // logMPUData(a, g, temp); // Uncomment to log every cycle (spammy)
+
+  // Calculate Pitch (Angle around Y-axis)
+  // Using accelerometer data (gravity vector)
+  // pitch = atan2(accelerationY, accelerationZ) * 180/PI
+  pitch = atan2(a.acceleration.y, a.acceleration.z) * 180 / PI;
+
+  // --- Safety Check: Tilt Detection ---
+  // Calculate angle of deviation from vertical (Z-axis)
+  float horizontalMag = sqrt(sq(a.acceleration.x) + sq(a.acceleration.y));
+  // Result in degrees. abs(a.acceleration.z) ensures we get the angle from the vertical axis.
+  tiltAngle = atan2(horizontalMag, abs(a.acceleration.z)) * 180.0 / PI;
+
+  if (tiltAngle > MAX_TILT_ANGLE) {
+    if (!isFallen) {
+      Serial.print("CRITICAL: Tracker has fallen! Tilt: ");
+      Serial.println(tiltAngle);
+      isFallen = true;
+    }
+  }
+}
+
 void updateLCD() {
   if (!availability[LCD]) return;
 
-  if (sensors.hasFallen()) {
+  if (isFallen) {
     lcd.clear();
     vLcd.clear();
     lcd.setCursor(0, 0);
@@ -487,8 +647,8 @@ void updateLCD() {
     vLcd.setLine(1, "  SYSTEM FALLEN  ");
     lcd.setCursor(0, 2);
     lcd.print("Tilt Angle: ");
-    lcd.print(sensors.getTiltAngle());
-    vLcd.setLine(2, "Tilt Angle: " + String(sensors.getTiltAngle()));
+    lcd.print(tiltAngle);
+    vLcd.setLine(2, "Tilt Angle: " + String(tiltAngle));
     lcd.setCursor(0, 3);
     lcd.print("Please Reset System");
     vLcd.setLine(3, "Please Reset System");
@@ -523,14 +683,14 @@ void updateLCD() {
     lcd.print("SENSOR ERROR - MAN");
     vLcd.setLine(startLine + 1, "SENSOR ERROR - MAN");
   } else {
-    sprintf(buffer, "P:%-4s R:%-4s", motors.getPitchStatus().c_str(), motors.getRotationStatus().c_str());
+    sprintf(buffer, "P:%-4s R:%-4s", pitchStatus.c_str(), rotationStatus.c_str());
     lcd.setCursor(0, startLine + 1);
     lcd.print(buffer);
     vLcd.setLine(startLine + 1, String(buffer));
   }
 
   // Line 2: Heading & Pitch
-  sprintf(buffer, "H:%-3d P:%-3d", sensors.getHeading(), sensors.getPitch());
+  sprintf(buffer, "H:%-3d P:%-3d", heading, pitch);
   lcd.setCursor(0, startLine + 2);
   lcd.print(buffer);
   vLcd.setLine(startLine + 2, String(buffer));
@@ -546,33 +706,97 @@ void updateLCD() {
     char stat_buffer[21];
     lcd.setCursor(0, 3);
     // Note: \3 is degreeC symbol from register
-    sprintf(stat_buffer, "T:%.1f\3 WiFiSrv: %c", sensors.getTemp(), wifiStat);
+    sprintf(stat_buffer, "T:%.1f\3 WiFiSrv: %c", mpuTemp, wifiStat);
     lcd.print(stat_buffer);
     
     // For virtual LCD, replace special chars with readable ones
     String vStatStr = (wifiStat == '\0') ? "OK" : ((wifiStat == '\1') ? "X" : "AP");
-    sprintf(stat_buffer, "T:%.1fC WiFi:%s", sensors.getTemp(), vStatStr.c_str());
+    sprintf(stat_buffer, "T:%.1fC WiFi:%s", mpuTemp, vStatStr.c_str());
     vLcd.setLine(3, String(stat_buffer));
   }
 }
 
 
+// --- Motor Control Functions ---
+
+void pitchUp() {
+  if (pitch >= PITCH_LIMIT_MAX) {
+    stopPitch();
+    pitchStatus = "MAX";
+    return;
+  }
+  digitalWrite(MOTOR_B_DIR_PIN, HIGH);
+  analogWrite(MOTOR_B_PWM_PIN, MOTOR_SPEED);
+  pitchStatus = "UP";
+}
+
+void pitchDown() {
+  if (pitch <= PITCH_LIMIT_MIN) {
+    stopPitch();
+    pitchStatus = "MIN";
+    return;
+  }
+  digitalWrite(MOTOR_B_DIR_PIN, LOW);
+  analogWrite(MOTOR_B_PWM_PIN, MOTOR_SPEED);
+  pitchStatus = "DOWN";
+}
+
+void stopPitch() {
+  analogWrite(MOTOR_B_PWM_PIN, 0);
+  pitchStatus = "STOP";
+}
+
+void rotateClockwise() {
+  if (heading >= HEADING_LIMIT_MAX) {
+    stopRotation();
+    rotationStatus = "MAX";
+    return;
+  }
+  digitalWrite(MOTOR_A_DIR_PIN, HIGH);
+  analogWrite(MOTOR_A_PWM_PIN, MOTOR_SPEED);
+  rotationStatus = "CW";
+}
+
+void rotateCounterClockwise() {
+  if (heading <= HEADING_LIMIT_MIN) {
+    stopRotation();
+    rotationStatus = "MIN";
+    return;
+  }
+  digitalWrite(MOTOR_A_DIR_PIN, LOW);
+  analogWrite(MOTOR_A_PWM_PIN, MOTOR_SPEED);
+  rotationStatus = "CCW";
+}
+
+void stopRotation() {
+  analogWrite(MOTOR_A_PWM_PIN, 0);
+  rotationStatus = "STOP";
+}
+
+void homePitchMotor() {
+  // Not used if we flatten instead
+  flattenPitchMotor();
+}
+
 void flattenPitchMotor() {
   if (sensorError) return;
-  Serial.println("Flattening Pitch...");
+  Serial.println("Flattening Pitch to Limit...");
   unsigned long startTime = millis();
 
-  while (sensors.getPitch() > PITCH_LIMIT_MIN && millis() - startTime < 15000) {
-    sensors.update();
-    motors.pitchDown(sensors.getPitch());
+  // Run until pitch hits minimum or timeout (safety)
+  while (pitch > PITCH_LIMIT_MIN && millis() - startTime < 15000) {
+    readPitch();  // Keep updating pitch!
+    pitchDown();
     delay(50);
   }
-  motors.stopPitch();
+  stopPitch();
 }
 
 void homeRotationMotor() {
+  // Placeholder: Move motor for a fixed duration.
+  // Replace with limit switch logic or compass-based homing.
   Serial.println("Homing Rotation (placeholder)...");
-  motors.rotateCCW(sensors.getHeading());
-  delay(5000);
-  motors.stopRotation();
+  rotateCounterClockwise();
+  delay(5000);  // Adjust this duration based on your hardware
+  stopRotation();
 }

@@ -1,0 +1,44 @@
+[
+  {
+    "label": "Arduino: Select Connected Board (fzf)",
+    "command": "line=$(arduino-cli board list | fzf --header-lines=1); if [ -n \"$line\" ]; then port=$(echo \"$line\" | awk '{print $1}'); fqbn=$(echo \"$line\" | grep -oE '[a-zA-Z0-9_-]+:[a-zA-Z0-9_-]+:[a-zA-Z0-9_-]+' | head -n 1); echo \"ARDUINO_PORT=$port\" > .env; echo \"ARDUINO_FQBN=$fqbn\" >> .env; echo \"✅ Updated .env with Port=$port, FQBN=$fqbn\"; else echo \"❌ No board selected.\"; fi",
+    "save": "all",
+    "hide": "on_success",
+  },
+  {
+    "label": "Arduino: Compile Current Sketch",
+    "command": "source .env 2>/dev/null || true; if [ -z \"$ARDUINO_FQBN\" ]; then echo '❌ Error: ARDUINO_FQBN not set. Run \"Arduino: Select Connected Board (fzf)\" first.'; exit 1; fi; arduino-cli compile --fqbn \"$ARDUINO_FQBN\" \"$ZED_DIRNAME\"",
+    "save": "all",
+    "hide": "on_success",
+  },
+  {
+    "label": "Arduino: Upload Current Sketch",
+    "command": "source .env 2>/dev/null || true; if [ -z \"$ARDUINO_FQBN\" ] || [ -z \"$ARDUINO_PORT\" ]; then echo '❌ Error: Board config missing. Run \"Arduino: Select Connected Board (fzf)\" first.'; exit 1; fi; arduino-cli upload --fqbn \"$ARDUINO_FQBN\" -p \"$ARDUINO_PORT\" \"$ZED_DIRNAME\"",
+    "save": "all",
+    "hide": "on_success",
+  },
+  {
+    "label": "Arduino: Compile & Upload Current Sketch",
+    "command": "source .env 2>/dev/null || true; if [ -z \"$ARDUINO_FQBN\" ] || [ -z \"$ARDUINO_PORT\" ]; then echo '❌ Error: Board config missing. Run \"Arduino: Select Connected Board (fzf)\" first.'; exit 1; fi; arduino-cli compile --fqbn \"$ARDUINO_FQBN\" \"$ZED_DIRNAME\" && arduino-cli upload --fqbn \"$ARDUINO_FQBN\" -p \"$ARDUINO_PORT\" \"$ZED_DIRNAME\"",
+    "save": "all",
+    "hide": "on_success",
+  },
+  {
+    "label": "Arduino: Install Board Core (from .env)",
+    "command": "source .env 2>/dev/null || true; if [ -z \"$ARDUINO_FQBN\" ]; then echo '❌ Error: ARDUINO_FQBN not set. Run \"Arduino: Select Connected Board (fzf)\" first.'; exit 1; fi; core=$(echo \"$ARDUINO_FQBN\" | cut -d: -f1,2); echo \"📦 Installing core: $core\"; arduino-cli core update-index && arduino-cli core install \"$core\"",
+    "save": "all",
+    "hide": "on_success",
+  },
+  {
+    "label": "Arduino: Update LSP Database (clangd)",
+    "command": "source .env 2>/dev/null || true; if [ -z \"$ARDUINO_FQBN\" ]; then echo '❌ Error: ARDUINO_FQBN not set. Select board first.'; exit 1; fi; echo \"🔄 Generating compile_commands.json...\"; arduino-cli compile --fqbn \"$ARDUINO_FQBN\" --only-compilation-database --build-path \"$ZED_DIRNAME/build\" \"$ZED_DIRNAME\" && mv \"$ZED_DIRNAME/build/compile_commands.json\" \"$ZED_DIRNAME/\" && rm -rf \"$ZED_DIRNAME/build\" && echo \"✅ LSP Database generated in $ZED_DIRNAME!\"",
+    "save": "all",
+    "hide": "on_success",
+  },
+  {
+    "label": "Arduino: Install Required Libraries",
+    "command": "arduino-cli lib install \"hd44780\" \"Adafruit MPU6050\" \"Adafruit Unified Sensor\" && source .env 2>/dev/null || true; if [ -n \"$ARDUINO_FQBN\" ]; then echo \"🔄 Generating LSP database...\"; arduino-cli compile --fqbn \"$ARDUINO_FQBN\" --only-compilation-database --build-path \"$ZED_DIRNAME/build\" \"$ZED_DIRNAME\" && mv \"$ZED_DIRNAME/build/compile_commands.json\" \"$ZED_DIRNAME/\" && rm -rf \"$ZED_DIRNAME/build\" && echo \"✅ Libraries installed & LSP configured!\"; else echo \"⚠️ Libraries installed. Select a board (fzf) to finish configuring LSP.\"; fi",
+    "save": "all",
+    "hide": "on_success",
+  },
+]

@@ -87,17 +87,14 @@ const int MPU_ADDR = 0x68;                   // I2C address of MPU6050
 const float MAX_TILT_ANGLE = 45.0;
 const long INITIALIZATION_DELAY_MS = 10000;
 
+<<<<<<< Updated upstream
+=======
 // --- Classes ---
-
 class VirtualLCD {
   public:
     String lines[4];
-    VirtualLCD() {
-      for(int i=0; i<4; i++) lines[i] = "                    ";
-    }
-    void clear() {
-      for(int i=0; i<4; i++) lines[i] = "                    ";
-    }
+    VirtualLCD() { for(int i=0; i<4; i++) lines[i] = "                    "; }
+    void clear() { for(int i=0; i<4; i++) lines[i] = "                    "; }
     void setLine(int row, String text) {
       if (row >= 0 && row < 4) {
         lines[row] = text;
@@ -107,13 +104,20 @@ class VirtualLCD {
     }
 };
 
+>>>>>>> Stashed changes
 // --- Objects ---
 hd44780_I2Cexp lcd;
+<<<<<<< Updated upstream
+Adafruit_MPU6050 mpu;
+QMC5883LCompass compass;
+LDRManager ldrs(LDR_TOP_LEFT_PIN, LDR_TOP_RIGHT_PIN, LDR_BOTTOM_LEFT_PIN, LDR_BOTTOM_RIGHT_PIN);
+=======
 VirtualLCD vLcd;
 LDRManager ldrs(LDR_TOP_LEFT_PIN, LDR_TOP_RIGHT_PIN, LDR_BOTTOM_LEFT_PIN, LDR_BOTTOM_RIGHT_PIN);
 MotorController motors(MOTOR_A_DIR_PIN, MOTOR_A_PWM_PIN, MOTOR_A_BRAKE_PIN, 
                        MOTOR_B_DIR_PIN, MOTOR_B_PWM_PIN, MOTOR_B_BRAKE_PIN, MOTOR_SPEED);
 SensorManager sensors(MAX_TILT_ANGLE);
+>>>>>>> Stashed changes
 
 // --- Global Variables ---
 int deviceCount = 0;
@@ -204,7 +208,6 @@ void handleClient(WiFiClient client) {
           if (requestLine.indexOf("GET /data") >= 0) {
             client.println("HTTP/1.1 200 OK");
             client.println("Content-Type: application/json");
-            client.println("Access-Control-Allow-Origin: *");
             client.println("Connection: close");
             client.println();
 
@@ -215,16 +218,14 @@ void handleClient(WiFiClient client) {
             ldrArray.add(ldrs.getTopRight());
             ldrArray.add(ldrs.getBottomLeft());
             ldrArray.add(ldrs.getBottomRight());
-
-            JsonObject ldrAvg = doc.createNestedObject("ldrAvg");
-            ldrAvg["top"] = ldrs.getTopAverage();
-            ldrAvg["bottom"] = ldrs.getBottomAverage();
-            ldrAvg["left"] = ldrs.getLeftAverage();
-            ldrAvg["right"] = ldrs.getRightAverage();
             
             doc["heading"] = sensors.getHeading();
             doc["pitch"] = sensors.getPitch();
             doc["manual"] = manualMode;
+<<<<<<< Updated upstream
+            doc["fallen"] = isFallen;
+            doc["tilt"] = tiltAngle;
+=======
             doc["fallen"] = sensors.hasFallen();
             doc["tilt"] = sensors.getTiltAngle();
             doc["pitchStatus"] = motors.getPitchStatus();
@@ -232,12 +233,12 @@ void handleClient(WiFiClient client) {
 
             JsonArray lcdLines = doc.createNestedArray("lcd");
             for(int i=0; i<4; i++) lcdLines.add(vLcd.lines[i]);
+>>>>>>> Stashed changes
 
             serializeJson(doc, client);
           } else if (requestLine.indexOf("GET /cmd") >= 0) {
             client.println("HTTP/1.1 200 OK");
             client.println("Content-Type: text/plain");
-            client.println("Access-Control-Allow-Origin: *");
             client.println("Connection: close");
             client.println();
 
@@ -468,45 +469,104 @@ void shutdownRoutine() {
     flattenPitchMotor();
   }
   writeLCD("System asleep.");
+<<<<<<< Updated upstream
   Serial.println("System asleep.");
 }
 
 // --- Sensor & Display Functions ---
 
+void readSensors() {
+  // Now handled by LDRManager class call in main_loop
+  ldrs.update();
+}
+
+void readCompass() {
+  compass.read();
+  heading = compass.getAzimuth();
+}
+
+void logMPUData(sensors_event_t a, sensors_event_t g, sensors_event_t temp) {
+  Serial.print("Accel X: ");
+  Serial.print(a.acceleration.x);
+  Serial.print(", Y: ");
+  Serial.print(a.acceleration.y);
+  Serial.print(", Z: ");
+  Serial.print(a.acceleration.z);
+  Serial.print(" m/s^2");
+
+  Serial.print(" | Rotation X: ");
+  Serial.print(g.gyro.x);
+  Serial.print(", Y: ");
+  Serial.print(g.gyro.y);
+  Serial.print(", Z: ");
+  Serial.print(g.gyro.z);
+  Serial.print(" rad/s");
+
+  Serial.print(" | Temperature: ");
+  Serial.print(temp.temperature);
+  Serial.println(" degC");
+}
+
+void readPitch() {
+  sensors_event_t a, g, temp;
+  mpu.getEvent(&a, &g, &temp);
+#ifdef DEBUG_MPU
+  logMPUData(a, g, temp);
+#endif
+
+  // Store temp for LCD
+  mpuTemp = temp.temperature;
+
+  // Log data
+  // logMPUData(a, g, temp); // Uncomment to log every cycle (spammy)
+
+  // Calculate Pitch (Angle around Y-axis)
+  // Using accelerometer data (gravity vector)
+  // pitch = atan2(accelerationY, accelerationZ) * 180/PI
+  pitch = atan2(a.acceleration.y, a.acceleration.z) * 180 / PI;
+
+  // --- Safety Check: Tilt Detection ---
+  // Calculate angle of deviation from vertical (Z-axis)
+  float horizontalMag = sqrt(sq(a.acceleration.x) + sq(a.acceleration.y));
+  // Result in degrees. abs(a.acceleration.z) ensures we get the angle from the vertical axis.
+  tiltAngle = atan2(horizontalMag, abs(a.acceleration.z)) * 180.0 / PI;
+
+  if (tiltAngle > MAX_TILT_ANGLE) {
+    if (!isFallen) {
+      Serial.print("CRITICAL: Tracker has fallen! Tilt: ");
+      Serial.println(tiltAngle);
+      isFallen = true;
+    }
+  }
+}
+
 void updateLCD() {
   if (!availability[LCD]) return;
 
-  if (sensors.hasFallen()) {
+  if (isFallen) {
     lcd.clear();
-    vLcd.clear();
     lcd.setCursor(0, 0);
     lcd.print("!!! CRITICAL ERROR !!!");
-    vLcd.setLine(0, "!!! CRITICAL ERROR !!!");
     lcd.setCursor(0, 1);
     lcd.print("  SYSTEM FALLEN  ");
-    vLcd.setLine(1, "  SYSTEM FALLEN  ");
     lcd.setCursor(0, 2);
     lcd.print("Tilt Angle: ");
-    lcd.print(sensors.getTiltAngle());
-    vLcd.setLine(2, "Tilt Angle: " + String(sensors.getTiltAngle()));
+    lcd.print(tiltAngle);
     lcd.setCursor(0, 3);
     lcd.print("Please Reset System");
-    vLcd.setLine(3, "Please Reset System");
     return;
   }
 
   if (isShutdown) return;  // Don't update LCD if sleeping
 
   lcd.clear();
-  vLcd.clear();
   char buffer[21];
 
   // If in manual mode place a banner on all updates
   int startLine = 0;
   if (manualMode) {
     lcd.setCursor(0, 0);
-    lcd.print("=== MANUAL  MODE ===");
-    vLcd.setLine(0, "=== MANUAL  MODE ===");
+    lcd.print("==== MANUAL MODE ====");
     startLine = 1;
   }
 
@@ -514,26 +574,22 @@ void updateLCD() {
   sprintf(buffer, "L:%-4d R:%-4d", ldrs.getLeftAverage(), ldrs.getRightAverage());
   lcd.setCursor(0, startLine);
   lcd.print(buffer);
-  vLcd.setLine(startLine, String(buffer));
 
   // Line 1: Motor Status
   // If sensor error, show Manual Mode or Error
   if (sensorError) {
     lcd.setCursor(0, startLine + 1);
     lcd.print("SENSOR ERROR - MAN");
-    vLcd.setLine(startLine + 1, "SENSOR ERROR - MAN");
   } else {
-    sprintf(buffer, "P:%-4s R:%-4s", motors.getPitchStatus().c_str(), motors.getRotationStatus().c_str());
+    sprintf(buffer, "P:%-4s R:%-4s", pitchStatus.c_str(), rotationStatus.c_str());
     lcd.setCursor(0, startLine + 1);
     lcd.print(buffer);
-    vLcd.setLine(startLine + 1, String(buffer));
   }
 
   // Line 2: Heading & Pitch
-  sprintf(buffer, "H:%-3d P:%-3d", sensors.getHeading(), sensors.getPitch());
+  sprintf(buffer, "H:%-3d P:%-3d", heading, pitch);
   lcd.setCursor(0, startLine + 2);
   lcd.print(buffer);
-  vLcd.setLine(startLine + 2, String(buffer));
 
   // Line 3: Temp & WiFi Status (Simplified)
   // Disable if in Manual Mode
@@ -546,16 +602,74 @@ void updateLCD() {
     char stat_buffer[21];
     lcd.setCursor(0, 3);
     // Note: \3 is degreeC symbol from register
-    sprintf(stat_buffer, "T:%.1f\3 WiFiSrv: %c", sensors.getTemp(), wifiStat);
+    sprintf(stat_buffer, "T:%.1f\3 WiFiSrv: %c", mpuTemp, wifiStat);
     lcd.print(stat_buffer);
-    
-    // For virtual LCD, replace special chars with readable ones
-    String vStatStr = (wifiStat == '\0') ? "OK" : ((wifiStat == '\1') ? "X" : "AP");
-    sprintf(stat_buffer, "T:%.1fC WiFi:%s", sensors.getTemp(), vStatStr.c_str());
-    vLcd.setLine(3, String(stat_buffer));
   }
 }
 
+
+// --- Motor Control Functions ---
+
+void pitchUp() {
+  if (pitch >= PITCH_LIMIT_MAX) {
+    stopPitch();
+    pitchStatus = "MAX";
+    return;
+  }
+  digitalWrite(MOTOR_B_DIR_PIN, HIGH);
+  analogWrite(MOTOR_B_PWM_PIN, MOTOR_SPEED);
+  pitchStatus = "UP";
+}
+
+void pitchDown() {
+  if (pitch <= PITCH_LIMIT_MIN) {
+    stopPitch();
+    pitchStatus = "MIN";
+    return;
+  }
+  digitalWrite(MOTOR_B_DIR_PIN, LOW);
+  analogWrite(MOTOR_B_PWM_PIN, MOTOR_SPEED);
+  pitchStatus = "DOWN";
+}
+
+void stopPitch() {
+  analogWrite(MOTOR_B_PWM_PIN, 0);
+  pitchStatus = "STOP";
+}
+
+void rotateClockwise() {
+  if (heading >= HEADING_LIMIT_MAX) {
+    stopRotation();
+    rotationStatus = "MAX";
+    return;
+  }
+  digitalWrite(MOTOR_A_DIR_PIN, HIGH);
+  analogWrite(MOTOR_A_PWM_PIN, MOTOR_SPEED);
+  rotationStatus = "CW";
+}
+
+void rotateCounterClockwise() {
+  if (heading <= HEADING_LIMIT_MIN) {
+    stopRotation();
+    rotationStatus = "MIN";
+    return;
+  }
+  digitalWrite(MOTOR_A_DIR_PIN, LOW);
+  analogWrite(MOTOR_A_PWM_PIN, MOTOR_SPEED);
+  rotationStatus = "CCW";
+}
+
+void stopRotation() {
+  analogWrite(MOTOR_A_PWM_PIN, 0);
+  rotationStatus = "STOP";
+}
+
+void homePitchMotor() {
+  // Not used if we flatten instead
+  flattenPitchMotor();
+=======
+>>>>>>> Stashed changes
+}
 
 void flattenPitchMotor() {
   if (sensorError) return;
